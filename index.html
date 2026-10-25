@@ -3,6 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0A0A0B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="灵感引擎">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+
 <title>灵感引擎</title>
 <style>
   :root{
@@ -939,7 +948,34 @@
       ok = true;
     }
   }catch(e){ /* file:// 打开或服务没起，走 localStorage */ }
-  if(!ok) return;
+
+  if(!ok){
+    // 直接双击 index.html 的情况：如果本地服务在跑，把浏览器里的旧数据搬过去一次
+    try{
+      const xhr2 = new XMLHttpRequest();
+      xhr2.open("GET", "http://127.0.0.1:8765/api/empty", false);
+      xhr2.send(null);
+      if(xhr2.status === 200){
+        const r = JSON.parse(xhr2.responseText || "{}");
+        if(r.empty){
+          const payload = {};
+          let n = 0;
+          for(let i = 0; i < localStorage.length; i++){
+            const k = localStorage.key(i);
+            if(k && k.startsWith("kg_")){ payload[k] = localStorage.getItem(k); n++; }
+          }
+          if(n){
+            const xhr3 = new XMLHttpRequest();
+            xhr3.open("POST", "http://127.0.0.1:8765/api/state", false);
+            xhr3.setRequestHeader("Content-Type", "application/json");
+            xhr3.send(JSON.stringify(payload));
+            if(xhr3.status === 200) window.__migratedToFile = n;
+          }
+        }
+      }
+    }catch(e){}
+    return;
+  }
 
   // 服务端是空的，但浏览器里还有旧数据 —— 自动搬一次
   const old = {};
@@ -1724,30 +1760,40 @@ function updateSpeakNav(){
   b.title = on ? "自动朗读：开（点击关闭）" : "自动朗读：关（点击开启）";
 }
 
-function stopSpeak(){
-  if(window.speechSynthesis){ try{ speechSynthesis.cancel(); }catch(e){} }
-  speakingId = null;
-  const b = $("#btnSpeakNav");
-  if(b && !S.cfg.autoSpeak) b.classList.remove("speaking");
+function markSpeakBtn(id, on){
+  document.querySelectorAll('[data-speak="' + id + '"]').forEach(b => {
+    b.classList.toggle("on", on);
+    b.innerHTML = on ? STOP_SVG : SPEAK_SVG;
+    b.title = on ? "停止朗读" : "朗读这张卡";
+  });
 }
 
-function speakCard(c, which){
+function stopSpeak(){
+  const prev = speakingId;
+  if(window.speechSynthesis){ try{ speechSynthesis.cancel(); }catch(e){} }
+  speakingId = null;
+  if(prev) markSpeakBtn(prev, false);
+  document.querySelectorAll("[data-speak].on").forEach(b => {
+    b.classList.remove("on");
+    b.innerHTML = SPEAK_SVG;
+    b.title = "朗读这张卡";
+  });
+}
+
+function speakCard(c, which, manual){
   if(!c) return;
   if(!window.speechSynthesis){ toast("这个浏览器不支持语音朗读"); return; }
 
-  const front = which !== "back";
-  const text = which === "full"
-    ? (c.title + "。" + (c.domain ? c.domain + "。" : "") + (c.body || ""))
-    : front
-      ? (c.title + "。" + (c.domain ? c.domain + "。" : ""))
-      : (c.body || c.title);
+  const text = which === "back" ? (c.body || c.title)
+             : (c.title + "。" + (c.domain ? c.domain + "。" : "") + (c.body || ""));
 
   const clean = String(text || "").replace(/\s+/g, " ").trim();
   if(!clean) return;
 
   const wasSame = speakingId === c.id;
+  if(wasSame && !manual) return;   // 自动触发时，这张正在读就别打断
   stopSpeak();
-  if(wasSame && !S.cfg.autoSpeak){ return; }
+  if(wasSame && manual) return;    // 手动再点一次 = 停止
 
   const u = new SpeechSynthesisUtterance(clean);
   const v = pickChineseVoice();
@@ -1757,8 +1803,9 @@ function speakCard(c, which){
   u.pitch = 1;
 
   speakingId = c.id;
-  u.onend = () => { if(speakingId === c.id) speakingId = null; };
-  u.onerror = () => { if(speakingId === c.id) speakingId = null; };
+  markSpeakBtn(c.id, true);
+  u.onend = () => { if(speakingId === c.id){ speakingId = null; markSpeakBtn(c.id, false); } };
+  u.onerror = () => { if(speakingId === c.id){ speakingId = null; markSpeakBtn(c.id, false); } };
   speechSynthesis.speak(u);
 }
 
@@ -2291,6 +2338,7 @@ function appendSlide(c, animate = true){
         '<div class="domain" data-domain="' + esc(c.domain) + '">' + esc(c.domain) + '</div>' +
         '<div class="title">' + esc(c.title) + '</div>' +
         '<div class="cardFoot"><button class="saveBtn' + (c.saved ? " on" : "") + '" data-save="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
+          '<button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
           '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
           '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
       '</div>' +
@@ -2298,7 +2346,8 @@ function appendSlide(c, animate = true){
         '<div class="domain">' + esc(c.domain) + '</div>' +
         '<div class="body">' + esc(c.body) + '</div>' +
         '<div class="src">' + esc(c.source) + '</div>' +
-        '<div class="cardFoot"><button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
+        '<div class="cardFoot"><button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
+          '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
           '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
       '</div>' +
     '</div>' +
@@ -2311,16 +2360,19 @@ function appendSlide(c, animate = true){
     justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
   });
   el.addEventListener("click", ev => {
-    if(ev.target.closest("[data-save]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    if(ev.target.closest("[data-save]") || ev.target.closest("[data-speak]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
     const sel = window.getSelection();
     const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
     const dragged = downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8;
     if(hasSel || justSelected || dragged){ justSelected = false; return; }
     if(Number(el.dataset.i) === S.slide){
       el.classList.toggle("flipped");
-      if(S.cfg.autoSpeak) maybeAutoSpeak(c, el.classList.contains("flipped") ? "back" : "front");
+
     }
     else setSlide(Number(el.dataset.i));
+  });
+  el.querySelectorAll("[data-speak]").forEach(sp => {
+    sp.addEventListener("click", ev => { ev.stopPropagation(); speakCard(c, "full", true); });
   });
   const sb = el.querySelector("[data-save]");
   if(sb) sb.addEventListener("click", ev => { ev.stopPropagation(); toggleSave(sb.dataset.save, sb); });
@@ -2592,7 +2644,7 @@ function setSlide(i){
   });
 
   if(window.__autoSpeakNext !== false && S.view === "draw" && S.current && S.current[S.slide]){
-    maybeAutoSpeak(S.current[S.slide], "front");
+    maybeAutoSpeak(S.current[S.slide], "full");
   }
   window.__autoSpeakNext = true;
 
@@ -2680,6 +2732,7 @@ function appendBubble(c){
         (c.source ? '<div class="c2s">' + esc(c.source) + '</div>' : '') +
       '</div>' +
       '<div class="cardFoot"><button class="save2' + (c.saved ? " on" : "") + '" data-save2="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
+      '<button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
       '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
       '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
     '</div></div>';
@@ -2696,7 +2749,7 @@ function appendBubble(c){
     justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
   });
   orbit.addEventListener("click", ev => {
-    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-speak]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
 
     const sel = window.getSelection();
     const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
@@ -2709,6 +2762,9 @@ function appendBubble(c){
   orbit.querySelector("[data-close]").addEventListener("click", ev => {
     ev.stopPropagation();
     unfocusBubble();
+  });
+  orbit.querySelectorAll("[data-speak]").forEach(sp => {
+    sp.addEventListener("click", ev => { ev.stopPropagation(); speakCard(c, "full", true); });
   });
   const sb = orbit.querySelector("[data-save2]");
   sb.addEventListener("click", ev => {
@@ -4589,6 +4645,15 @@ try{ lastView = localStorage.getItem("kg_view_v1") || "draw"; }catch(e){}
 setView("draw");          // 先把抽卡视图的牌堆铺好
 restorePack();
 if(lastView && lastView !== "draw") setView(lastView);   // 再切回上次的视图
+</script>
+
+<script>
+/* PWA：只在 http(s) 下注册（file:// 打不开 Service Worker） */
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
 </script>
 </body>
 </html>

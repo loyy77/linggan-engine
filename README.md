@@ -30,6 +30,32 @@ data/
 
 两种方式随时可切：第一次用方式一启动时，如果 `data/` 是空的而浏览器里有旧数据，会自动搬一次过去。
 
+## 装成 App（PWA）
+
+跑 `启动.bat` 打开 `http://127.0.0.1:8765/` 之后：
+
+```
+桌面 Chrome / Edge   地址栏右侧出现「安装」图标 → 点一下，变成独立窗口
+手机 Chrome         菜单 →「添加到主屏幕」→ 全屏启动，有图标、无地址栏
+手机 Safari         分享 →「添加到主屏幕」→ 同上
+```
+
+装好之后是 `display: standalone`，没有地址栏，像一个原生 App。断网也能用——Service Worker 缓存了页面、图标和 manifest，数据本来就在本地。
+
+PWA 只在 http(s) 下生效。双击 `index.html`（`file://`）时 Service Worker 不会注册，功能不受影响，只是没有安装入口。
+
+包含的文件：
+
+```
+manifest.json            名称、图标、主题色、全屏模式
+sw.js                    Service Worker：网络优先，断网回退缓存
+icon-192.png             主屏图标
+icon-512.png             高分屏 / 商店素材
+icon-maskable-512.png    Android 自适应图标（留了安全区）
+```
+
+改了 `index.html` 之后刷新两次即可拿到新版（第一次是 SW 更新，第二次是页面本身）。
+
 ## 用法
 
 1. 双击 `启动.bat`（或者直接用 `index.html`，见上）

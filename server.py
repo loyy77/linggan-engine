@@ -106,6 +106,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.split("?")[0] == "/api/state":
             return self._json(200, read_all())
+        if self.path.split("?")[0] == "/api/empty":
+            return self._json(200, {"empty": len(read_all()) == 0})
         if self.path.split("?")[0] == "/api/ping":
             return self._json(200, {"ok": True, "dir": DATA_DIR})
         return super().do_GET()
@@ -139,10 +141,17 @@ class Handler(SimpleHTTPRequestHandler):
         return self._json(200, {"ok": True, "saved": saved})
 
     def end_headers(self):
-        # 开发时别缓存 HTML
+        # file:// 页面的 Origin 是 null，允许它跨域来搬数据
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         if self.path.endswith((".html", "/")) or "?" in self.path:
             self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.end_headers()
 
 
 def pick_port(start):
