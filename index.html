@@ -477,8 +477,20 @@
   .face.front .cardFoot .saveBtn.on{background:rgba(18,16,16,.88);color:#FFB38A}
   .face.front .cardFoot .saveBtn svg{width:18px;height:18px}
   /* 底条的「审查」小按钮 */
+  .cardFoot .speakBtn{
+    flex:none;width:48px;padding:0;margin:0;
+    display:grid;place-items:center;
+    border:0;border-left:1px solid rgba(255,255,255,.18);border-radius:0;
+    background:none;color:var(--fg3);cursor:pointer;transition:.15s;
+  }
+  .cardFoot .speakBtn svg{width:15px;height:15px}
+  .cardFoot .speakBtn:hover{background:rgba(255,107,53,.16);color:var(--acc)}
+  .cardFoot .speakBtn.on{background:rgba(255,107,53,.22);color:var(--acc)}
+  .face.front .cardFoot .speakBtn{border-left-color:rgba(255,255,255,.34);color:rgba(18,16,16,.62)}
+  .face.front .cardFoot .speakBtn:hover{background:rgba(255,255,255,.18);color:#121010}
+  .face.front .cardFoot .speakBtn.on{background:rgba(255,255,255,.30);color:#121010}
   .cardFoot .reviewBtn{
-    flex:none;width:68px;padding:0;margin:0;
+    flex:none;width:62px;padding:0;margin:0;
     display:grid;place-items:center;
     border:0;border-left:1px solid rgba(255,255,255,.18);border-radius:0;
     background:none;color:var(--fg3);cursor:pointer;
@@ -492,7 +504,7 @@
     border-top:1px solid rgba(255,255,255,.10);
     background:rgba(255,255,255,.025);
   }
-  .cardFoot .reviewBtn.auto{width:68px}
+  .cardFoot .reviewBtn.auto{width:62px}
   .cardFoot .reviewBtn.auto:hover{background:rgba(255,107,53,.24)}
   .face.back .cardFoot .reviewBtn{
     flex:1;width:auto;min-height:46px;color:var(--fg3);letter-spacing:.08em;
@@ -1143,6 +1155,10 @@
           <label class="chk"><input type="checkbox" id="cfgReview"> 生成后自动审查并改写（多一次模型调用，会慢 20–40 秒）</label>
         </div>
         <div class="field">
+          <label class="chk"><input type="checkbox" id="cfgAutoSpeak"> 切卡时自动朗读标题（翻面朗读正文）</label>
+          <div class="hint">用浏览器自带的语音合成，不联网、不消耗额度。点卡片底部的喇叭随时可以手动朗读或停下。</div>
+        </div>
+        <div class="field">
           <label>相关内容的取材方式</label>
           <div class="seg" id="cfgMode">
             <button data-mode="A">A 直接</button>
@@ -1203,7 +1219,7 @@ const DEFAULT_CFG = {
   base: "https://api.deepseek.com",
   model: "deepseek-flash",
   key: "",
-  ratio: 6, mode: "C", rotateSec: 60, refreshMin: 30, thinking: false, review: true,
+  ratio: 6, mode: "C", rotateSec: 60, refreshMin: 30, thinking: false, review: true, autoSpeak: false, speakRate: 1.05,
 };
 
 /* 三种取材方式：A 直接相关 / B 可迁移视角 / C 跨领域隐喻 */
@@ -1596,6 +1612,73 @@ function applyReview(cards, reviewed){
   return changed;
 }
 
+/* ============ 朗读（浏览器语音合成） ============ */
+let speakingId = null;
+
+function pickChineseVoice(){
+  if(!window.speechSynthesis) return null;
+  const vs = speechSynthesis.getVoices() || [];
+  return vs.find(v => /^zh[-_]CN/i.test(v.lang))
+      || vs.find(v => /^zh/i.test(v.lang))
+      || null;
+}
+
+function stopSpeak(){
+  if(window.speechSynthesis){ try{ speechSynthesis.cancel(); }catch(e){} }
+  speakingId = null;
+  document.querySelectorAll("[data-speak]").forEach(b => {
+    b.classList.remove("on");
+    b.innerHTML = SPEAK_SVG;
+    b.title = "朗读这张卡";
+  });
+}
+
+function speakText(text, id, btn){
+  if(!window.speechSynthesis){ toast("这个浏览器不支持语音朗读"); return; }
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if(!clean){ toast("这张卡没有可读的内容"); return; }
+
+  const wasSame = speakingId === id;
+  stopSpeak();
+  if(wasSame) return;   // 再点一次 = 停止
+
+  const u = new SpeechSynthesisUtterance(clean);
+  const v = pickChineseVoice();
+  if(v) u.voice = v;
+  u.lang = "zh-CN";
+  u.rate = Number(S.cfg.speakRate) || 1.05;
+  u.pitch = 1;
+
+  speakingId = id;
+  if(btn){
+    btn.classList.add("on");
+    btn.innerHTML = STOP_SVG;
+    btn.title = "停止朗读";
+  }
+  u.onend = () => { if(speakingId === id) stopSpeak(); };
+  u.onerror = () => { if(speakingId === id) stopSpeak(); };
+  speechSynthesis.speak(u);
+}
+
+/* 卡片按当前面朗读：正面读标题+领域，背面读正文 */
+function speakCard(c, which){
+  if(!c) return;
+  const btn = document.querySelector('[data-speak="' + c.id + '"]');
+  const front = which !== "back";
+  const text = which === "full"
+    ? (c.title + "。" + (c.domain ? c.domain + "。" : "") + (c.body || ""))
+    : front
+      ? (c.title + "。" + (c.domain ? c.domain + "。" : ""))
+      : (c.body || c.title);
+  speakText(text, c.id, btn);
+}
+
+function maybeAutoSpeak(c, which){
+  if(!S.cfg.autoSpeak) return;
+  if(!window.speechSynthesis) return;
+  speakCard(c, which);
+}
+
 /* ============ 单卡审查（手动触发） ============ */
 function buildSingleReviewPrompt(c){
   return [
@@ -1883,6 +1966,8 @@ function buildCollidePrompt(a, b){
 /* ============ 抽卡 ============ */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.3l2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9z"/></svg>';
+const SPEAK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.6v12.8L7.2 14.5H4z" fill="currentColor" stroke="none"/><path d="M15.4 9a4.2 4.2 0 0 1 0 6M18 6.6a8 8 0 0 1 0 10.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const STOP_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.2" fill="currentColor" stroke="none"/></svg>';
 
 function normalizeCard(raw, theme, demo){
   if(!raw || typeof raw !== "object") return null;
@@ -2020,6 +2105,7 @@ function savePack(){
 }
 
 function restorePack(){
+  window.__autoSpeakNext = false;
   let p = null;
   try{ p = JSON.parse(localStorage.getItem(PACK_KEY) || "null"); }catch(e){}
   if(!p || !Array.isArray(p.ids) || !p.ids.length) return false;
@@ -2100,6 +2186,7 @@ function appendSlide(c, animate = true){
         '<div class="domain" data-domain="' + esc(c.domain) + '">' + esc(c.domain) + '</div>' +
         '<div class="title">' + esc(c.title) + '</div>' +
         '<div class="cardFoot"><button class="saveBtn' + (c.saved ? " on" : "") + '" data-save="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
+          '<button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
           '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
           '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
       '</div>' +
@@ -2107,7 +2194,8 @@ function appendSlide(c, animate = true){
         '<div class="domain">' + esc(c.domain) + '</div>' +
         '<div class="body">' + esc(c.body) + '</div>' +
         '<div class="src">' + esc(c.source) + '</div>' +
-        '<div class="cardFoot"><button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
+        '<div class="cardFoot"><button class="speakBtn" data-speak="' + c.id + '" title="朗读正文">' + SPEAK_SVG + '</button>' +
+          '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
           '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
       '</div>' +
     '</div>' +
@@ -2120,16 +2208,25 @@ function appendSlide(c, animate = true){
     justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
   });
   el.addEventListener("click", ev => {
-    if(ev.target.closest("[data-save]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    if(ev.target.closest("[data-save]") || ev.target.closest("[data-speak]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
     const sel = window.getSelection();
     const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
     const dragged = downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8;
     if(hasSel || justSelected || dragged){ justSelected = false; return; }
-    if(Number(el.dataset.i) === S.slide) el.classList.toggle("flipped");
+    if(Number(el.dataset.i) === S.slide){
+      el.classList.toggle("flipped");
+      if(S.cfg.autoSpeak) maybeAutoSpeak(c, el.classList.contains("flipped") ? "back" : "front");
+    }
     else setSlide(Number(el.dataset.i));
   });
   const sb = el.querySelector("[data-save]");
   if(sb) sb.addEventListener("click", ev => { ev.stopPropagation(); toggleSave(sb.dataset.save, sb); });
+  el.querySelectorAll("[data-speak]").forEach(sp => {
+    sp.addEventListener("click", ev => {
+      ev.stopPropagation();
+      speakCard(c, el.classList.contains("flipped") ? "back" : "front");
+    });
+  });
   el.querySelectorAll("[data-review], [data-review-auto]").forEach(rv => {
     rv.addEventListener("click", ev => {
       ev.stopPropagation();
@@ -2397,6 +2494,11 @@ function setSlide(i){
     if(k !== S.slide) el.classList.remove("flipped");
   });
 
+  if(window.__autoSpeakNext !== false && S.view === "draw" && S.current && S.current[S.slide]){
+    maybeAutoSpeak(S.current[S.slide], "front");
+  }
+  window.__autoSpeakNext = true;
+
   const strip = $("#strip");
   if(strip){
     [...strip.querySelectorAll(".thumb")].forEach((t, k) => t.classList.toggle("on", k === S.slide));
@@ -2481,6 +2583,7 @@ function appendBubble(c){
         (c.source ? '<div class="c2s">' + esc(c.source) + '</div>' : '') +
       '</div>' +
       '<div class="cardFoot"><button class="save2' + (c.saved ? " on" : "") + '" data-save2="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
+      '<button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
       '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
       '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
     '</div></div>';
@@ -2497,7 +2600,7 @@ function appendBubble(c){
     justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
   });
   orbit.addEventListener("click", ev => {
-    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-speak]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
 
     const sel = window.getSelection();
     const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
@@ -2515,6 +2618,12 @@ function appendBubble(c){
   sb.addEventListener("click", ev => {
     ev.stopPropagation();
     toggleSave(c.id, sb);
+  });
+  orbit.querySelectorAll("[data-speak]").forEach(sp => {
+    sp.addEventListener("click", ev => {
+      ev.stopPropagation();
+      speakCard(c, "full");
+    });
   });
   orbit.querySelectorAll("[data-review], [data-review-auto]").forEach(rv => {
     rv.addEventListener("click", ev => {
@@ -3056,6 +3165,7 @@ function exitBubble(){
 /* ============ 视图切换 ============ */
 function setView(v){
   const prev = S.view;
+  if(prev !== v) stopSpeak();   // 换视图就闭嘴
   S.view = v;
   if(["draw", "bubble", "hist", "fav"].includes(v)){
     try{ localStorage.setItem("kg_view_v1", v); }catch(e){}
@@ -3795,6 +3905,7 @@ function openSettings(){
   $("#cfgRefresh").value = S.cfg.refreshMin;
   $("#cfgRefreshVal").textContent = S.cfg.refreshMin;
   if($("#cfgReview")) $("#cfgReview").checked = S.cfg.review !== false;
+  if($("#cfgAutoSpeak")) $("#cfgAutoSpeak").checked = !!S.cfg.autoSpeak;
   $("#testOut").textContent = "";
   setModeUI(currentMode());
   renderPresetUI();
@@ -3811,6 +3922,8 @@ function applyCfg(){
   S.cfg.rotateSec = Number($("#cfgRotate").value);
   S.cfg.refreshMin = Number($("#cfgRefresh").value);
   S.cfg.review = $("#cfgReview") ? $("#cfgReview").checked : true;
+  S.cfg.autoSpeak = $("#cfgAutoSpeak") ? $("#cfgAutoSpeak").checked : false;
+  if(!S.cfg.autoSpeak) stopSpeak();
   saveCfg();
   refreshHint();
   closeSettings();
