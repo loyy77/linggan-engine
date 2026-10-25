@@ -121,6 +121,8 @@
   .modelTag:hover{color:var(--fg);border-color:var(--line2)}
   .modelTag.demo{color:var(--warn);border-color:rgba(255,107,107,.35)}
   .modelWrap{position:relative;flex:none}
+  #btnSpeakNav svg{width:17px;height:17px}
+  #btnSpeakNav.on{color:var(--acc);border-color:rgba(255,107,53,.55);background:rgba(255,107,53,.12)}
   /* 模型下拉集成进主题框：左侧分隔线，去掉自己的外框 */
   .themeWrap .modelWrap{
     align-self:stretch;display:flex;align-items:center;
@@ -920,6 +922,100 @@
 </style>
 </head>
 <body>
+<script>
+/* ============================================================
+   存储层：优先用本地服务的 data/ 目录，拿不到就退回 localStorage。
+   做法是把 window.localStorage 换成一个内存版实现，启动时同步拉一次
+   /api/state，之后每次写入防抖后推回服务端。业务代码一行都不用改。
+   ============================================================ */
+(function initFileStore(){
+  let ok = false, data = {};
+  try{
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", "/api/state", false);   // 同步，必须在页面初始化之前拿到
+    xhr.send(null);
+    if(xhr.status === 200){
+      data = JSON.parse(xhr.responseText || "{}");
+      ok = true;
+    }
+  }catch(e){ /* file:// 打开或服务没起，走 localStorage */ }
+  if(!ok) return;
+
+  // 服务端是空的，但浏览器里还有旧数据 —— 自动搬一次
+  const old = {};
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      old[k] = localStorage.getItem(k);
+    }
+  }catch(e){}
+
+  const mem = Object.assign({}, data);
+  let migrated = [];
+  if(Object.keys(mem).length === 0 && Object.keys(old).length){
+    for(const k in old){
+      if(k.startsWith("kg_") || k.startsWith("inspiration")){ mem[k] = old[k]; migrated.push(k); }
+    }
+  }
+
+  let timer = null;
+  const pending = new Set();
+
+  function flush(useBeacon){
+    if(!pending.size) return;
+    const body = {};
+    pending.forEach(k => { body[k] = (k in mem) ? mem[k] : null; });
+    pending.clear();
+    const text = JSON.stringify(body);
+    if(useBeacon && navigator.sendBeacon){
+      try{ navigator.sendBeacon("/api/state", new Blob([text], {type:"application/json"})); return; }catch(e){}
+    }
+    try{
+      fetch("/api/state", {method:"POST", headers:{"Content-Type":"application/json"}, body:text, keepalive:true});
+    }catch(e){}
+  }
+
+  const shim = {
+    getItem(k){ return (k in mem) ? mem[k] : null; },
+    setItem(k, v){
+      mem[k] = String(v);
+      pending.add(k);
+      clearTimeout(timer);
+      timer = setTimeout(() => flush(false), 250);
+    },
+    removeItem(k){
+      delete mem[k];
+      pending.add(k);
+      clearTimeout(timer);
+      timer = setTimeout(() => flush(false), 250);
+    },
+    clear(){
+      Object.keys(mem).forEach(k => delete mem[k]);
+      pending.clear();
+      try{ fetch("/api/reset", {method:"POST"}); }catch(e){}
+    },
+    key(i){ return Object.keys(mem)[i] ?? null; },
+    get length(){ return Object.keys(mem).length; }
+  };
+
+  try{
+    Object.defineProperty(window, "localStorage", {value: shim, configurable: true, writable: true});
+  }catch(e){
+    // 少数浏览器不让覆盖，那就别用文件存储
+    return;
+  }
+
+  window.__fileStore = true;
+  if(migrated.length){
+    migrated.forEach(k => pending.add(k));
+    flush(false);
+  }
+
+  window.addEventListener("beforeunload", () => flush(true));
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState === "hidden") flush(false); });
+})();
+</script>
+
 
 <header>
   <div class="brand">灵感<span>引擎</span></div>
@@ -938,6 +1034,7 @@
   </div>
   <button class="iconBtn" id="btnFavNav" title="收藏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.3l2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9z"/></svg><span class="badge" id="favBadge"></span></button>
   <button class="iconBtn" id="btnHistNav" title="历史">≡<span class="badge" id="histBadge"></span></button>
+  <button class="iconBtn" id="btnSpeakNav" title="自动朗读（关）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.6v12.8L7.2 14.5H4z" fill="currentColor" stroke="none"/><path d="M15.4 9a4.2 4.2 0 0 1 0 6M18 6.6a8 8 0 0 1 0 10.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
   <button class="iconBtn" id="btnSettings" title="设置">⚙</button>
 </header>
 
@@ -1153,10 +1250,6 @@
         </div>
         <div class="field">
           <label class="chk"><input type="checkbox" id="cfgReview"> 生成后自动审查并改写（多一次模型调用，会慢 20–40 秒）</label>
-        </div>
-        <div class="field">
-          <label class="chk"><input type="checkbox" id="cfgAutoSpeak"> 切卡时自动朗读标题（翻面朗读正文）</label>
-          <div class="hint">用浏览器自带的语音合成，不联网、不消耗额度。点卡片底部的喇叭随时可以手动朗读或停下。</div>
         </div>
         <div class="field">
           <label>相关内容的取材方式</label>
@@ -1612,7 +1705,7 @@ function applyReview(cards, reviewed){
   return changed;
 }
 
-/* ============ 朗读（浏览器语音合成） ============ */
+/* ============ 朗读（浏览器语音合成，全局一个开关） ============ */
 let speakingId = null;
 
 function pickChineseVoice(){
@@ -1623,24 +1716,38 @@ function pickChineseVoice(){
       || null;
 }
 
+function updateSpeakNav(){
+  const b = $("#btnSpeakNav");
+  if(!b) return;
+  const on = !!S.cfg.autoSpeak;
+  b.classList.toggle("on", on);
+  b.title = on ? "自动朗读：开（点击关闭）" : "自动朗读：关（点击开启）";
+}
+
 function stopSpeak(){
   if(window.speechSynthesis){ try{ speechSynthesis.cancel(); }catch(e){} }
   speakingId = null;
-  document.querySelectorAll("[data-speak]").forEach(b => {
-    b.classList.remove("on");
-    b.innerHTML = SPEAK_SVG;
-    b.title = "朗读这张卡";
-  });
+  const b = $("#btnSpeakNav");
+  if(b && !S.cfg.autoSpeak) b.classList.remove("speaking");
 }
 
-function speakText(text, id, btn){
+function speakCard(c, which){
+  if(!c) return;
   if(!window.speechSynthesis){ toast("这个浏览器不支持语音朗读"); return; }
-  const clean = String(text || "").replace(/\s+/g, " ").trim();
-  if(!clean){ toast("这张卡没有可读的内容"); return; }
 
-  const wasSame = speakingId === id;
+  const front = which !== "back";
+  const text = which === "full"
+    ? (c.title + "。" + (c.domain ? c.domain + "。" : "") + (c.body || ""))
+    : front
+      ? (c.title + "。" + (c.domain ? c.domain + "。" : ""))
+      : (c.body || c.title);
+
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if(!clean) return;
+
+  const wasSame = speakingId === c.id;
   stopSpeak();
-  if(wasSame) return;   // 再点一次 = 停止
+  if(wasSame && !S.cfg.autoSpeak){ return; }
 
   const u = new SpeechSynthesisUtterance(clean);
   const v = pickChineseVoice();
@@ -1649,33 +1756,31 @@ function speakText(text, id, btn){
   u.rate = Number(S.cfg.speakRate) || 1.05;
   u.pitch = 1;
 
-  speakingId = id;
-  if(btn){
-    btn.classList.add("on");
-    btn.innerHTML = STOP_SVG;
-    btn.title = "停止朗读";
-  }
-  u.onend = () => { if(speakingId === id) stopSpeak(); };
-  u.onerror = () => { if(speakingId === id) stopSpeak(); };
+  speakingId = c.id;
+  u.onend = () => { if(speakingId === c.id) speakingId = null; };
+  u.onerror = () => { if(speakingId === c.id) speakingId = null; };
   speechSynthesis.speak(u);
 }
 
-/* 卡片按当前面朗读：正面读标题+领域，背面读正文 */
-function speakCard(c, which){
-  if(!c) return;
-  const btn = document.querySelector('[data-speak="' + c.id + '"]');
-  const front = which !== "back";
-  const text = which === "full"
-    ? (c.title + "。" + (c.domain ? c.domain + "。" : "") + (c.body || ""))
-    : front
-      ? (c.title + "。" + (c.domain ? c.domain + "。" : ""))
-      : (c.body || c.title);
-  speakText(text, c.id, btn);
+function toggleSpeakGlobal(){
+  S.cfg.autoSpeak = !S.cfg.autoSpeak;
+  saveCfg();
+  updateSpeakNav();
+  if(S.cfg.autoSpeak){
+    const c = (S.current && S.current[S.slide]) || (S.cards[S.slide]);
+    if(c){
+      const el = document.querySelector(".slide.on");
+      speakCard(c, el && el.classList.contains("flipped") ? "back" : "front");
+    }
+    toast("自动朗读已开 · 切卡和翻面时会读");
+  }else{
+    stopSpeak();
+    toast("自动朗读已关");
+  }
 }
 
 function maybeAutoSpeak(c, which){
-  if(!S.cfg.autoSpeak) return;
-  if(!window.speechSynthesis) return;
+  if(!S.cfg.autoSpeak || !c) return;
   speakCard(c, which);
 }
 
@@ -2186,7 +2291,6 @@ function appendSlide(c, animate = true){
         '<div class="domain" data-domain="' + esc(c.domain) + '">' + esc(c.domain) + '</div>' +
         '<div class="title">' + esc(c.title) + '</div>' +
         '<div class="cardFoot"><button class="saveBtn' + (c.saved ? " on" : "") + '" data-save="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
-          '<button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
           '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
           '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
       '</div>' +
@@ -2194,8 +2298,7 @@ function appendSlide(c, animate = true){
         '<div class="domain">' + esc(c.domain) + '</div>' +
         '<div class="body">' + esc(c.body) + '</div>' +
         '<div class="src">' + esc(c.source) + '</div>' +
-        '<div class="cardFoot"><button class="speakBtn" data-speak="' + c.id + '" title="朗读正文">' + SPEAK_SVG + '</button>' +
-          '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
+        '<div class="cardFoot"><button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
           '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
       '</div>' +
     '</div>' +
@@ -2208,7 +2311,7 @@ function appendSlide(c, animate = true){
     justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
   });
   el.addEventListener("click", ev => {
-    if(ev.target.closest("[data-save]") || ev.target.closest("[data-speak]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    if(ev.target.closest("[data-save]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
     const sel = window.getSelection();
     const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
     const dragged = downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8;
@@ -2221,12 +2324,6 @@ function appendSlide(c, animate = true){
   });
   const sb = el.querySelector("[data-save]");
   if(sb) sb.addEventListener("click", ev => { ev.stopPropagation(); toggleSave(sb.dataset.save, sb); });
-  el.querySelectorAll("[data-speak]").forEach(sp => {
-    sp.addEventListener("click", ev => {
-      ev.stopPropagation();
-      speakCard(c, el.classList.contains("flipped") ? "back" : "front");
-    });
-  });
   el.querySelectorAll("[data-review], [data-review-auto]").forEach(rv => {
     rv.addEventListener("click", ev => {
       ev.stopPropagation();
@@ -2583,7 +2680,6 @@ function appendBubble(c){
         (c.source ? '<div class="c2s">' + esc(c.source) + '</div>' : '') +
       '</div>' +
       '<div class="cardFoot"><button class="save2' + (c.saved ? " on" : "") + '" data-save2="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
-      '<button class="speakBtn" data-speak="' + c.id + '" title="朗读这张卡">' + SPEAK_SVG + '</button>' +
       '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
       '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
     '</div></div>';
@@ -2600,7 +2696,7 @@ function appendBubble(c){
     justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
   });
   orbit.addEventListener("click", ev => {
-    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-speak]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
 
     const sel = window.getSelection();
     const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
@@ -2618,12 +2714,6 @@ function appendBubble(c){
   sb.addEventListener("click", ev => {
     ev.stopPropagation();
     toggleSave(c.id, sb);
-  });
-  orbit.querySelectorAll("[data-speak]").forEach(sp => {
-    sp.addEventListener("click", ev => {
-      ev.stopPropagation();
-      speakCard(c, "full");
-    });
   });
   orbit.querySelectorAll("[data-review], [data-review-auto]").forEach(rv => {
     rv.addEventListener("click", ev => {
@@ -2801,6 +2891,9 @@ function focusBubble(i, manual){
   if(!orbits.length) return;
 
   bubbleIdx = ((i % orbits.length) + orbits.length) % orbits.length;
+
+  // 自动朗读：泡泡切到谁就读谁（手动点击和自动轮播都算）
+  if(S.cfg.autoSpeak && bubbleItems[bubbleIdx]) maybeAutoSpeak(bubbleItems[bubbleIdx], "full");
 
   orbits.forEach((o, k) => {
     if(k === bubbleIdx){
@@ -3905,7 +3998,6 @@ function openSettings(){
   $("#cfgRefresh").value = S.cfg.refreshMin;
   $("#cfgRefreshVal").textContent = S.cfg.refreshMin;
   if($("#cfgReview")) $("#cfgReview").checked = S.cfg.review !== false;
-  if($("#cfgAutoSpeak")) $("#cfgAutoSpeak").checked = !!S.cfg.autoSpeak;
   $("#testOut").textContent = "";
   setModeUI(currentMode());
   renderPresetUI();
@@ -3922,8 +4014,6 @@ function applyCfg(){
   S.cfg.rotateSec = Number($("#cfgRotate").value);
   S.cfg.refreshMin = Number($("#cfgRefresh").value);
   S.cfg.review = $("#cfgReview") ? $("#cfgReview").checked : true;
-  S.cfg.autoSpeak = $("#cfgAutoSpeak") ? $("#cfgAutoSpeak").checked : false;
-  if(!S.cfg.autoSpeak) stopSpeak();
   saveCfg();
   refreshHint();
   closeSettings();
@@ -4294,6 +4384,12 @@ function bind(){
   $("#btnTest").onclick = testConn;
   $("#mask").onclick = e => { if(e.target.id === "mask") closeSettings(); };
   if(/[?&]seam=1\b/.test(location.search)) document.documentElement.classList.add("seam-debug");
+
+  const speakNav = $("#btnSpeakNav");
+  if(speakNav){
+    speakNav.onclick = toggleSpeakGlobal;
+    updateSpeakNav();
+  }
 
   const rvMask = $("#reviewMask");
   if(rvMask){

@@ -1,3 +1,6 @@
 预览-*.png
 .DS_Store
 Thumbs.db
+data/
+server.log
+__pycache__/

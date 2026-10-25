@@ -2,11 +2,37 @@
 
 无聊时按一下，抽 10 条来自不相干领域的火花。点开看，喜欢的收进灵感库,两张撞一下看能不能撞出新点子。
 
-单文件，无依赖，双击 `index.html` 就能用。
+单文件页面，无第三方依赖。数据可以存本地文件，也可以只存在浏览器里。
+
+## 怎么打开
+
+**方式一：双击 `启动.bat`（推荐）**
+
+起一个本地服务（只用 Python 标准库，不用装依赖），自动打开 `http://127.0.0.1:8765/`。数据落在同目录的 `data/` 下，一个 key 一个文件，格式化过的纯文本：
+
+```
+data/
+  cards.json        卡片（含收藏标记）
+  cfg.json          模型配置（含 API key）
+  collides.json     碰撞记录
+  pack.json         当前这包 + 看到第几张
+  bubble.json       泡泡焦点
+  view.json         上次停留的视图
+  models.json       已验证的模型
+  theme_input.json  主题输入框内容
+```
+
+可以直接看、直接改、直接 git 管。`data/` 在 `.gitignore` 里，因为 `cfg.json` 存着 API key。
+
+**方式二：双击 `index.html`**
+
+不用起服务，但浏览器不允许网页写本地文件，数据只能进 localStorage。换目录名、换浏览器、清缓存都会丢。
+
+两种方式随时可切：第一次用方式一启动时，如果 `data/` 是空的而浏览器里有旧数据，会自动搬一次过去。
 
 ## 用法
 
-1. 双击打开 `index.html`（Chrome / Edge）
+1. 双击 `启动.bat`（或者直接用 `index.html`，见上）
 2. 点右下角 ⚙ 填 API：任意 OpenAI 兼容接口
    - Base URL：`https://api.deepseek.com/v1`
    - Model：`deepseek-chat`
