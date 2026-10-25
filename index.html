@@ -1,0 +1,4385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>灵感引擎</title>
+<style>
+  :root{
+    --bg:#0A0A0B; --bg2:#121110; --panel:#121110;
+    --line:rgba(242,242,242,.11); --line2:rgba(242,242,242,.22);
+    --fg:#F2F2F2; --fg2:rgba(242,242,242,.62); --fg3:rgba(242,242,242,.38);
+    --acc:#FF6B35; --acc2:#F4511E; --warn:#FF6B6B;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"SF Mono",Consolas,"Liberation Mono",monospace;
+    --r:2px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow-x:hidden}
+  body{
+    background:radial-gradient(1250px 760px at 50% -16%,#4A1B0A 0%,#2A1408 42%,var(--bg) 68%);
+    color:var(--fg);
+    font:15px/1.6 var(--sans);
+    display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(242,242,242,.028) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(242,242,242,.028) 1px,transparent 1px);
+    background-size:72px 72px;
+    -webkit-mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,transparent 72%);
+    mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,transparent 72%);
+  }
+  header,main,.tabs{position:relative;z-index:1}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  input{font:inherit;color:inherit}
+
+  /* ---------- topbar ---------- */
+  header{
+    position:sticky;top:0;z-index:20;
+    display:flex;gap:10px;align-items:center;
+    padding:14px 18px;
+    background:rgba(8,8,15,.82);backdrop-filter:blur(14px);
+    border-bottom:1px solid rgba(255,107,53,.3);
+  }
+  .brand::before{content:"";display:inline-block;width:8px;height:8px;background:#F4511E;box-shadow:0 0 12px rgba(244,81,30,.9);margin-right:9px;vertical-align:1px}
+  .brand{font-family:var(--sans);font-weight:800;letter-spacing:-.01em;font-size:18px;white-space:nowrap}
+  .brand span{color:var(--acc)}
+  .themeWrap{flex:1;display:flex;align-items:center;gap:8px;
+    background:var(--bg2);border:1px solid var(--line);border-radius:2px;
+    padding:6px 14px;min-width:0}
+  .themeWrap input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:14px}
+  .themeWrap{position:relative}
+  .themeMenu{
+    position:absolute;top:calc(100% + 6px);left:-1px;right:-1px;z-index:80;
+    background:var(--bg2);border:1px solid var(--line2);border-radius:2px;
+    padding:4px;max-height:264px;overflow:auto;display:none;
+    box-shadow:0 18px 40px -20px rgba(0,0,0,.9);
+  }
+  .themeMenu.on{display:block}
+  .themeMenu button{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    width:100%;padding:7px 9px;background:none;border:0;border-radius:2px;
+    color:var(--fg2);font-size:12.5px;text-align:left;cursor:pointer;transition:.12s;
+  }
+  .themeMenu button:hover{background:rgba(255,107,53,.13);color:var(--fg)}
+  .themeMenu .cnt{color:var(--fg3);font:10.5px/1 var(--mono);letter-spacing:.04em;flex:none}
+  .histFilter{display:flex;align-items:center;gap:6px;margin:0 0 10px;position:relative}
+  .histTabs{flex:1;min-width:0;display:flex;gap:6px;overflow:hidden;white-space:nowrap}
+  .histTab{
+    display:inline-flex;align-items:center;gap:5px;flex:none;
+    font-size:11.5px;padding:4px 8px;border-radius:2px;
+    border:1px solid var(--line);color:var(--fg3);cursor:pointer;transition:.12s;
+    user-select:none;
+  }
+  .histTab b{font-weight:550}
+  .histTab em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--fg3);opacity:.8}
+  .histTab:hover{color:var(--fg2);border-color:var(--line2)}
+  .histTab.on{border-color:rgba(255,107,53,.6);background:rgba(255,107,53,.13);color:var(--fg)}
+  .histTab.on em{color:var(--acc);opacity:1}
+  .histTab .tabX{
+    font-style:normal;line-height:1;padding:0 2px;margin-left:1px;
+    opacity:0;border-radius:2px;transition:.12s;
+  }
+  .histTab:hover .tabX{opacity:.5}
+  .histTab .tabX:hover{opacity:1;background:rgba(255,255,255,.14);color:var(--fg)}
+  .histMore{
+    flex:none;width:27px;height:26px;display:grid;place-items:center;
+    border-radius:2px;border:1px solid var(--line);background:none;
+    color:var(--fg3);cursor:pointer;transition:.12s;
+  }
+  .histMore svg{width:14px;height:14px;fill:currentColor}
+  .histMore:hover{color:var(--fg);border-color:var(--line2)}
+  .histMoreMenu{
+    position:absolute;top:calc(100% + 6px);right:0;z-index:70;
+    min-width:190px;max-height:264px;overflow:auto;
+    background:var(--bg2);border:1px solid var(--line2);border-radius:2px;
+    padding:4px;display:none;box-shadow:0 18px 40px -20px rgba(0,0,0,.9);
+  }
+  .histMoreMenu.on{display:block}
+  .histMoreMenu button{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    width:100%;padding:7px 9px;background:none;border:0;border-radius:2px;
+    color:var(--fg2);font-size:12px;text-align:left;cursor:pointer;transition:.12s;
+  }
+  .histMoreMenu button:hover{background:rgba(255,107,53,.13);color:var(--fg)}
+  .histMoreMenu button em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--fg3)}
+  .listCard .tags .tTag{cursor:pointer;border-bottom:1px dashed transparent}
+  .listCard .tags .tTag:hover{color:var(--acc);border-bottom-color:rgba(255,107,53,.5)}
+  .themeWrap input::placeholder{color:var(--fg3)}
+  .pill{font-size:11px;color:var(--fg3);white-space:nowrap;cursor:pointer;
+        user-select:none;padding:2px 7px;border-radius:2px;transition:.15s}
+  .pill:hover{color:var(--fg);background:rgba(255,255,255,.06)}
+  .modelTag{
+    flex:none;max-width:158px;padding:5px 9px;border-radius:2px;
+    border:1px solid var(--line);background:none;color:var(--fg3);
+    font:10.5px/1 var(--mono);letter-spacing:.03em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    cursor:pointer;transition:.15s;
+  }
+  .modelTag:hover{color:var(--fg);border-color:var(--line2)}
+  .modelTag.demo{color:var(--warn);border-color:rgba(255,107,107,.35)}
+  .modelWrap{position:relative;flex:none}
+  /* 模型下拉集成进主题框：左侧分隔线，去掉自己的外框 */
+  .themeWrap .modelWrap{
+    align-self:stretch;display:flex;align-items:center;
+    margin:0 -6px 0 2px;padding-left:10px;
+    border-left:1px solid var(--line);
+  }
+  .themeWrap .modelTag{
+    border:0;background:none;padding:4px 6px;max-width:132px;
+  }
+  .themeWrap .modelTag:hover{background:rgba(255,255,255,.06);color:var(--fg)}
+  .themeWrap .modelMenu{right:auto;left:0}
+  .modelMenu{
+    position:absolute;top:calc(100% + 8px);right:0;z-index:80;
+    min-width:200px;max-width:min(72vw,280px);padding:4px;display:none;
+    background:var(--bg2);border:1px solid var(--line2);border-radius:2px;
+    box-shadow:0 20px 44px -22px rgba(0,0,0,.95);
+  }
+  .modelMenu.on{display:block}
+  .modelMenu .modelList button{
+    display:flex;align-items:center;gap:9px;width:100%;
+    padding:7px 9px;border:0;border-radius:2px;background:none;
+    color:var(--fg2);font-size:12px;text-align:left;cursor:pointer;transition:.12s;
+  }
+  .modelMenu .modelList button:hover{background:rgba(255,107,53,.13);color:var(--fg)}
+  .modelMenu .modelList button.on{color:var(--acc)}
+  .modelMenu .mName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .modelMenu .mBase{flex:none;font:9.5px/1 var(--mono);color:var(--fg3);opacity:.75}
+  .modelMenu .mCheck{flex:none;width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  .modelSep{height:1px;background:var(--line);margin:4px 2px}
+  .modelMenu .modelCfg{
+    display:flex;align-items:center;gap:8px;width:100%;
+    padding:7px 9px;border:0;border-radius:2px;background:none;
+    color:var(--fg3);font-size:12px;text-align:left;cursor:pointer;transition:.12s;
+  }
+  .modelMenu .modelCfg svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .modelMenu .modelCfg:hover{background:rgba(255,107,53,.13);color:var(--fg)}
+  .pill b,.pill i,.pill #modeTag{font-style:normal;font-weight:600}
+  .pill b,.pill #modeTag{border-radius:2px;transition:.12s;padding:1px 4px;cursor:pointer}
+  .pill b{color:var(--acc)}
+  .pill b:hover,.pill #modeTag:hover{background:rgba(255,107,53,.16);color:var(--fg)}
+  .pillDot{opacity:.45;font-size:10px;margin:0 1px}
+  .iconBtn{position:relative;width:36px;height:36px;border-radius:2px;display:grid;place-items:center;
+    border:1px solid var(--line);background:var(--bg2);color:var(--fg2);flex:none;font-size:15px}
+  .iconBtn .badge{
+    position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;
+    border-radius:999px;background:var(--acc2);color:#121010;
+    font-size:9.5px;font-weight:800;line-height:16px;text-align:center;
+    font-family:var(--mono);letter-spacing:0;
+  }
+  .iconBtn .badge:empty{display:none}
+  .iconBtn.active{border-color:var(--acc);color:var(--acc);background:rgba(244,81,30,.12)}
+  .iconBtn svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+  .iconBtn:hover{color:var(--fg);border-color:var(--line2)}
+
+  /* ---------- main ---------- */
+  main{flex:1;padding:22px 18px 84px;max-width:1180px;width:100%;margin:0 auto}
+
+  .hero{
+    display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;
+    padding:56px 32px 52px;margin:0 0 24px;
+    background:linear-gradient(158deg,#FF9166 0%,#F4511E 58%,#E64A19 100%);
+    border:1px solid rgba(255,255,255,.16);
+    box-shadow:0 40px 90px -50px rgba(244,81,30,1),inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .hero h1{background:none;-webkit-text-fill-color:#121010;color:#121010;text-shadow:none}
+  .hero p{color:rgba(18,16,16,.82)}
+  .hero .hint{color:rgba(18,16,16,.6)}
+  .hero .kicker{background:rgba(255,255,255,.34);border-color:rgba(18,16,16,.45);color:#121010}
+  .hero .drawBtn{
+    background:#121010;color:#FF8A5B;border-color:#121010;font-weight:800;
+    box-shadow:0 0 46px -14px rgba(0,0,0,.5);
+  }
+  .hero .drawBtn:hover{background:#000000;color:#FFD6C4;box-shadow:0 0 60px -8px rgba(0,0,0,.6)}
+  .hero::after{background:linear-gradient(90deg,transparent,rgba(18,16,16,.35),transparent)}
+  .kicker{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:#FFB38A;background:rgba(244,81,30,.2);border:1px solid rgba(255,107,53,.4);
+    padding:6px 12px;margin-bottom:2px;
+  }
+  .hero h1{
+    margin:0;font-size:46px;font-weight:800;letter-spacing:-.04em;font-family:var(--sans);line-height:1.1;
+    color:#FFFFFF;
+  }
+  .hero p{margin:0;color:var(--fg2);font-size:13.5px;max-width:470px;line-height:1.7}
+  .hero::after{content:"";width:100%;max-width:470px;height:1px;margin-top:22px;
+    background:linear-gradient(90deg,transparent,rgba(255,107,53,.55),transparent)}
+  .drawBtn{
+    margin-top:6px;padding:14px 40px;border-radius:2px;font-weight:700;font-size:15px;
+    letter-spacing:.01em;
+    background:#F4511E;color:#FFFFFF;border:1px solid #FF8A5B;
+    box-shadow:0 0 40px -12px rgba(244,81,30,.9);
+    transition:background .15s ease,box-shadow .2s;
+  }
+  .drawBtn:hover{background:#FF8A5B;box-shadow:0 0 54px -10px rgba(255,107,53,.9)}
+  .drawBtn:disabled{opacity:.45;cursor:default;transform:none;box-shadow:none}
+  .hint{font-size:12px;color:var(--fg3)}
+
+  /* ---------- cards ---------- */
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(236px,1fr))}
+  .card{
+    position:relative;height:218px;perspective:1200px;cursor:pointer;
+    animation:pop .34s cubic-bezier(.2,.9,.3,1.2) both;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+  .inner{position:relative;z-index:1;width:100%;height:100%;transition:transform .5s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d}
+  .card.flipped .inner,
+  .slide.flipped .inner{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;border-radius:var(--r);padding:18px;
+    backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+  .face.front{
+    border:1px solid rgba(255,255,255,.30);
+    background:linear-gradient(155deg,#FF9769,#F4511E 62%,#E64A19);
+    box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 24px 60px -30px rgba(244,81,30,.95);
+  }
+  .face.back{
+    border:1px solid var(--line2);
+    background:linear-gradient(160deg,#141312,#0A0A0B 72%);
+    box-shadow:0 1px 0 rgba(255,255,255,.04) inset;
+  }
+  .face.front .domain{color:rgba(18,16,16,.78)}
+  .face.front .title{color:#121010}
+  .face.front .src{color:rgba(18,16,16,.55)}
+  .face.front .domain::before{background:#121010}
+  .face.front .saveBtn{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.34);color:#121010}
+  .face.back::after{
+    content:"";position:absolute;inset:0;border-radius:var(--r);pointer-events:none;
+    background:radial-gradient(300px 120px at 100% 0%,rgba(255,107,53,.14),transparent 70%);
+  }
+  .face.back{transform:rotateY(180deg)}
+  .domain::before{content:"";display:inline-block;width:5px;height:5px;background:#F4511E;margin-right:7px;vertical-align:2px}
+  .domain{
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:#FFB38A;font-weight:600;
+    font-family:var(--mono);
+  }
+  .title{font-size:15.8px;line-height:1.5;font-weight:600;font-family:var(--sans);letter-spacing:.01em;margin:11px 0 0;
+    display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+  .body{font-size:13.2px;line-height:1.68;color:#DCDCE8;overflow-y:auto;margin-top:9px;-webkit-overflow-scrolling:touch}
+  .src{font-size:12px;color:var(--fg3);margin-top:auto;padding-top:8px}
+  .saveBtn{
+    position:absolute;bottom:10px;right:10px;width:28px;height:28px;border-radius:2px;
+    display:grid;place-items:center;font-size:14px;color:var(--fg3);
+    background:rgba(255,255,255,.04);border:1px solid var(--line);z-index:3;
+  }
+  .saveBtn:hover{color:var(--warn)}
+  .saveBtn.on{color:var(--warn);background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35)}
+  .card.flipped .saveBtn,
+  .slide.flipped .saveBtn{opacity:0;pointer-events:none}
+
+  .demoTag{
+    position:absolute;top:8px;right:8px;z-index:2;
+    font-size:9.5px;padding:2px 6px;border-radius:2px;letter-spacing:.02em;
+    background:rgba(255,107,107,.14);color:var(--warn);border:1px solid rgba(255,107,107,.3);
+  }
+  .errBar{
+    display:flex;align-items:flex-start;gap:12px;
+    padding:12px 14px;margin-bottom:14px;border-radius:2px;
+    background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.26);
+  }
+  .errBar .errMsg{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .errBar b{font-size:12px;color:var(--warn);font-weight:600}
+  .errBar span{font-size:11.5px;color:var(--fg2);line-height:1.55;word-break:break-word}
+  .errBar .miniBtn{flex:none;margin-top:1px}
+
+  /* ---------- 层叠轮播 ---------- */
+  .deckWrap{position:relative;display:flex;align-items:center;justify-content:center;margin:4px 0 0}
+  .deck{position:relative;height:min(52vh,420px);width:100%}
+  .deckMeta{display:flex;align-items:center;gap:9px;min-width:0}
+  .themeTag{
+    display:none;flex:none;max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:10.5px;padding:2px 7px;border-radius:2px;
+    border:1px solid rgba(255,107,53,.5);background:rgba(255,107,53,.13);color:var(--acc);
+    font-family:var(--mono);letter-spacing:.02em;
+  }
+  .themeTag.on{display:inline-block}
+  .timeTag{
+    flex:none;font:10.5px/1 var(--mono);letter-spacing:.03em;
+    color:var(--fg3);white-space:nowrap;
+  }
+  .deckWrap.reviewing .deck{opacity:.72;transition:opacity .3s}
+  .deckHint{position:absolute;inset:0;display:grid;place-items:center;
+    color:var(--fg3);font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.18em;text-transform:uppercase}
+  .slide{
+    position:absolute;left:50%;top:0;width:min(70vw,436px);height:calc(100% - 18px);
+    transform:translateX(-50%) scale(.78) translateX(64%) rotate(3.5deg);
+    opacity:0;pointer-events:none;
+    transition:transform .55s cubic-bezier(.22,.9,.28,1),opacity .45s;
+  }
+  .slide.on{transform:translateX(-50%) scale(1) translateX(0) rotate(0);opacity:1;pointer-events:auto;z-index:10}
+  /* 垫底层：卡片做 3D 变换时浏览器会分块光栅化，块与块之间可能漏 1px，
+     露出下面的深色背景，看上去就是一条竖黑线。垫一层同色渐变把缝补上。 */
+  .slide::before{
+    content:"";position:absolute;inset:0;border-radius:var(--r);z-index:0;
+    background:linear-gradient(155deg,#FF9769,#F4511E 62%,#E64A19);
+    opacity:0;transition:opacity .2s;
+  }
+  .slide.on::before{opacity:1}
+  .slide.flipped::before{opacity:0}
+  /* 诊断模式：地址加 ?seam=1，垫底层换成荧光绿。
+     卡片本身不透明，所以绿色只会从「缝隙」里透出来。 */
+  html.seam-debug .slide.on::before{background:#00FF00}
+  @keyframes dealIn{
+    0%{opacity:0;filter:blur(3px)}
+    60%{opacity:1;filter:blur(0)}
+    100%{opacity:1}
+  }
+  .slide.dealing{animation:dealIn .42s cubic-bezier(.2,.9,.3,1.1)}
+  .slide.prev{transform:translateX(-50%) scale(.8) translateX(-62%) rotate(-3.5deg);opacity:.5;pointer-events:auto;z-index:5}
+  .slide.next{transform:translateX(-50%) scale(.8) translateX(62%) rotate(3.5deg);opacity:.5;pointer-events:auto;z-index:5}
+  .slide.hide{transform:translateX(-50%) scale(.7);opacity:0;pointer-events:none;z-index:1}
+  .slide .face{--px:26px;--py:22px;padding:var(--py) var(--px)}
+  .slide .title{font-size:24px;line-height:1.34;-webkit-line-clamp:6;margin-top:14px;letter-spacing:-.02em;font-weight:750}
+  /* 正面没有「点击翻面」了，标题在领域和底部收藏条之间居中 */
+  .slide .face.front .title{margin-top:auto;margin-bottom:auto}
+  .slide .body{font-size:16px;line-height:1.75;margin-top:12px}
+  .slide .src{font-size:12px}
+
+  .navBtn{
+    position:absolute;top:50%;transform:translateY(-50%);z-index:20;
+    width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+    background:rgba(8,8,15,.72);border:1px solid var(--line2);color:var(--fg2);
+    font-size:21px;line-height:1;backdrop-filter:blur(6px);transition:.15s;
+  }
+  .navBtn svg{width:18px;height:18px;display:block;fill:none;stroke:currentColor;
+    stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+  .navBtn:hover{color:var(--fg);border-color:rgba(255,107,53,.6)}
+  .navBtn.prev{left:2px} .navBtn.next{right:2px}
+
+  .strip{display:flex;gap:8px;overflow-x:auto;padding:16px 4px 6px;scrollbar-width:none}
+  .strip::-webkit-scrollbar{display:none}
+  .thumb{
+    flex:1 1 0;min-width:76px;max-width:150px;width:auto;padding:9px 11px;border-radius:2px;
+    border:1px solid var(--line);background:var(--bg2);text-align:left;
+    color:var(--fg3);transition:.18s;
+  }
+  .thumb:hover{color:var(--fg2);border-color:var(--line2)}
+  .thumb.on{border-color:rgba(255,107,53,.6);background:rgba(255,107,53,.1);color:var(--fg)}
+  .thumb .td{display:block;font-size:9px;letter-spacing:.05em;color:var(--acc);margin-bottom:4px}
+  .thumb .tt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;line-height:1.45}
+
+  /* ---------- bubble view ---------- */
+  .bubbleStage{
+    position:relative;overflow:hidden;border-radius:2px;
+    height:calc(100dvh - 232px);min-height:400px;
+    background:radial-gradient(700px 480px at 50% 44%,rgba(255,107,53,.075),transparent 74%);
+    touch-action:manipulation;
+  }
+  .bubbleStage.has-focus .orbit:not(.focus) .bubble{opacity:.3;filter:blur(.6px);transform:scale(.78)}
+  .orbit{
+    position:absolute;z-index:1;
+    transform:translate(-50%,-50%);
+    pointer-events:none;      /* 命中判定交给 bubble 自己，别用外层盒子 */
+    transition:left .9s cubic-bezier(.22,.9,.28,1),
+               top .9s cubic-bezier(.22,.9,.28,1);
+  }
+  .orbit.focus{z-index:8}
+  /* 漂移单独一层，由 JS 逐帧驱动，切焦点时可平滑归零，不会和定位打架 */
+  .drift{will-change:translate}
+  .bubble{
+    width:114px;height:114px;border-radius:50%;
+    pointer-events:auto;
+    display:grid;place-items:center;
+    border:1px solid rgba(255,255,255,.30);
+    background:radial-gradient(circle at 34% 28%,#FF9769,#E64A19 72%);
+    box-shadow:0 10px 32px -14px rgba(255,107,53,.55),inset 0 1px 0 rgba(255,255,255,.09);
+    cursor:pointer;overflow:hidden;
+    will-change:width,height;
+    transition:width .6s cubic-bezier(.22,.9,.28,1),
+               height .6s cubic-bezier(.22,.9,.28,1),
+               border-radius .6s,border-color .22s,box-shadow .22s;
+  }
+  /* 悬停：加粗描边（用 ring 而不是 border-width，避免布局抖动） */
+  .orbit{transition:opacity .35s ease}
+  .orbit.fresh{opacity:0}
+  .orbit:not(.focus) .bubble:hover{
+    border-color:rgba(255,107,53,.95);
+    box-shadow:0 0 0 2px rgba(255,107,53,.5),
+               0 12px 34px -14px rgba(255,107,53,.75),
+               inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  /* 被大卡压暗的卡，悬停时浮出来 */
+  .bubbleStage.has-focus .orbit:not(.focus) .bubble:hover{
+    opacity:.85;filter:none;
+  }
+  .bubble .ball{font-size:11px;color:rgba(18,16,16,.9);letter-spacing:.08em;text-align:center;padding:0 10px;line-height:1.35}
+  .bubble .card2{display:none}
+  .orbit.focus .bubble{
+    width:min(86vw,520px);height:min(74vh,486px);
+    border-radius:4px;padding:0;display:flex;flex-direction:column;
+    text-align:left;overflow:hidden;cursor:default;position:relative;
+    background:radial-gradient(circle at 20% 0%,rgba(244,81,30,.30),rgba(10,10,26,.98) 62%);
+    box-shadow:0 32px 80px -30px rgba(0,0,0,.95),0 0 0 1px rgba(255,107,53,.3),inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  /* 内容区自己滚，底部进度条不动 */
+  .orbit.focus .bubble .card2{
+    display:block;flex:1;min-height:0;align-self:stretch;width:100%;
+    padding:30px 32px 18px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;-ms-overflow-style:none;
+  }
+  .orbit.focus .bubble .card2::-webkit-scrollbar{width:0;height:0;display:none}
+
+  /* 大卡展开时逐行浮现 */
+  @keyframes lineIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .card2 .ln{display:block}
+  /* 展开过程中先把内容藏起来，等宽度稳定、拆好行再逐行放出来，
+     否则用户会先看到完整文字，再"重播"一遍动画 */
+  /* 标题、分类、下划线不参与动画，卡片一张开就在那儿；只有正文逐行 */
+  .card2.anim:not(.ready) > p,
+  .card2.anim:not(.ready) > .c2s{opacity:0}
+  .card2.anim.ready .ln{animation:lineIn .34s cubic-bezier(.2,.9,.3,1) both;animation-delay:var(--d,0ms)}
+  .card2.anim.ready > .c2s{animation:lineIn .34s ease both;animation-delay:var(--d,600ms)}
+
+  .orbit:not(.focus) .bubble{clip-path:circle(50% at 50% 50%)}
+  .orbit:not(.focus){filter:drop-shadow(0 6px 16px rgba(255,107,53,.26))}
+  .orbit.focus .bubble .ball{display:none}
+  .orbit.focus .bubble .card2{display:block}
+  .c2d{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#FFB38A;font-weight:600;font-family:var(--mono)}
+  .tRow{display:flex;gap:11px;align-items:flex-start;margin-top:14px}
+  .tRow h3,.tRow .title{flex:1;min-width:0;margin:0}
+  .tRow .saveBtn,
+  .card2 .tRow .save2{
+    position:static;flex:none;width:30px;height:30px;padding:0;margin-top:1px;
+    display:grid;place-items:center;border-radius:2px;
+  }
+  .saveBtn svg,.save2 svg{width:15px;height:15px;display:block;
+    fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+
+  /* 泡泡卡的收藏行：和抽卡卡用同一套分隔线 / 内边距 / 底色 */
+  .cardFoot{
+    display:none;flex:none;align-self:stretch;align-items:stretch;justify-content:center;
+    padding:0;
+    border-top:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.05);
+  }
+  /* 抽卡卡正面：贴底的一条，负 margin 抵消 .face 的内边距 */
+  .face.front .cardFoot{
+    display:flex;align-items:stretch;margin:14px calc(var(--px) * -1) calc(var(--py) * -1);
+    padding:0;
+    border-top:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.05);
+  }
+  .face.front .cardFoot .saveBtn{
+    position:static;flex:1;width:auto;min-height:52px;padding:14px 0;margin:0;
+    display:grid;place-items:center;
+    border:0;border-radius:0;background:none;
+    color:#121010;cursor:pointer;transition:background .15s,color .15s;
+  }
+  .face.front .cardFoot .saveBtn:hover{background:rgba(255,255,255,.16)}
+  .face.front .cardFoot .saveBtn.on{background:rgba(18,16,16,.88);color:#FFB38A}
+  .face.front .cardFoot .saveBtn svg{width:18px;height:18px}
+  /* 底条的「审查」小按钮 */
+  .cardFoot .reviewBtn{
+    flex:none;width:68px;padding:0;margin:0;
+    display:grid;place-items:center;
+    border:0;border-left:1px solid rgba(255,255,255,.18);border-radius:0;
+    background:none;color:var(--fg3);cursor:pointer;
+    font-size:11px;letter-spacing:.06em;transition:.15s;
+  }
+  .cardFoot .reviewBtn:hover{background:rgba(255,107,53,.16);color:var(--acc)}
+  /* 背面：内容页底部也放一条审查 */
+  .face.back .cardFoot{
+    display:flex;align-items:stretch;
+    margin:0 calc(var(--px) * -1) calc(var(--py) * -1);
+    border-top:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.025);
+  }
+  .cardFoot .reviewBtn.auto{width:68px}
+  .cardFoot .reviewBtn.auto:hover{background:rgba(255,107,53,.24)}
+  .face.back .cardFoot .reviewBtn{
+    flex:1;width:auto;min-height:46px;color:var(--fg3);letter-spacing:.08em;
+  }
+  .face.back .cardFoot .reviewBtn:first-child{border-left:0}
+  .rvOk{
+    margin:0 0 12px;padding:8px 11px;border-left:2px solid var(--acc);
+    background:rgba(255,107,53,.10);font-size:12px;color:#FFB59A;
+  }
+  .face.back .cardFoot .reviewBtn:hover{background:rgba(255,107,53,.14);color:var(--acc)}
+  .face.front .cardFoot .reviewBtn{border-left-color:rgba(255,255,255,.34);color:rgba(18,16,16,.62)}
+  .face.front .cardFoot .reviewBtn:hover{background:rgba(255,255,255,.18);color:#121010}
+  .orbit.focus .cardFoot{display:flex}
+  .cardFoot .save2{
+    flex:1;width:auto;min-height:52px;padding:14px 0;margin:0;
+    display:grid;place-items:center;
+    border:0;border-radius:0;background:none;
+    color:var(--fg2);cursor:pointer;transition:background .15s,color .15s;
+  }
+  .cardFoot .save2:hover{color:var(--warn);background:rgba(255,107,107,.09)}
+  .cardFoot .save2.on{color:var(--warn);background:rgba(255,107,107,.1)}
+  .cardFoot .save2 svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+  .cardFoot .save2.on svg{fill:currentColor}
+  .saveBtn.on svg,.save2.on svg{fill:currentColor}
+  .card2 h3{margin:12px 0 14px;font-size:24px;line-height:1.34;font-weight:750;letter-spacing:-.02em;padding-right:30px;font-family:var(--sans)}
+  .orbit.focus .bubble{position:relative}
+  .closeBtn{
+    position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;
+    font-size:0;color:var(--fg2);background:rgba(255,255,255,.07);border:1px solid var(--line);
+    z-index:6;transition:.15s;
+  }
+  .closeBtn::before,.closeBtn::after{
+    content:"";position:absolute;left:50%;top:50%;width:11px;height:1.5px;
+    background:currentColor;border-radius:1px;
+  }
+  .closeBtn::before{transform:translate(-50%,-50%) rotate(45deg)}
+  .closeBtn::after{transform:translate(-50%,-50%) rotate(-45deg)}
+  .closeBtn:hover{color:#fff;background:rgba(255,255,255,.15);border-color:var(--line2)}
+  .card2 p{margin:0;font-size:16px;line-height:1.78;color:#DCDCE8}
+  .card2 .c2s{margin-top:14px;font-size:11px;color:var(--fg3)}
+  .card2 .save2{margin-top:14px;font-size:11.5px;color:var(--fg2);border:1px solid var(--line2);border-radius:2px;padding:5px 12px}
+  .card2 .save2.on{color:var(--warn);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.1)}
+
+  .bubbleBar{
+    display:flex;align-items:center;gap:8px;margin-top:14px;
+    font-size:11.5px;color:var(--fg3);flex-wrap:wrap;
+  }
+  .bubbleBar{position:relative}
+  .bubbleBar #bubbleInfo{margin-right:auto}
+  .themeChip{
+    display:none;flex:none;max-width:32vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:10.5px;padding:2px 8px;border-radius:2px;
+    border:1px solid rgba(255,107,53,.5);background:rgba(255,107,53,.13);
+    color:var(--acc);font-family:var(--mono);letter-spacing:.02em;
+  }
+  .themeChip.on{display:inline-block}
+  .bubbleTip{
+    position:absolute;bottom:calc(100% + 10px);left:0;z-index:45;
+    max-width:min(88vw,330px);padding:12px 14px;display:none;
+    background:var(--bg2);border:1px solid var(--line2);border-radius:2px;
+    font-size:12px;line-height:1.66;color:var(--fg2);
+    box-shadow:0 20px 44px -22px rgba(0,0,0,.95);
+  }
+  .bubbleTip.on{display:block}
+  .bubbleTip p{margin:0}
+  .bubbleTip p + p{margin-top:7px;color:var(--fg3)}
+  .bubbleTip b{color:var(--acc);font-weight:600}
+  .iconMini{
+    flex:none;width:30px;height:30px;display:grid;place-items:center;
+    border-radius:2px;border:1px solid var(--line);background:none;
+    color:var(--fg3);cursor:pointer;transition:.12s;
+  }
+  .iconMini:hover{color:var(--fg);border-color:var(--line2);background:rgba(255,255,255,.04)}
+  .iconMini:disabled{opacity:.35;cursor:default;background:none}
+  .iconMini svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .iconMini.fill svg{fill:currentColor;stroke:none}
+  /* 计时被冻住时，暂停键亮起 */
+  .iconMini.on{
+    color:var(--acc);border-color:rgba(255,107,53,.62);
+    background:rgba(255,107,53,.15);
+    box-shadow:0 0 0 1px rgba(255,107,53,.22),0 0 14px -5px rgba(255,107,53,.85);
+  }
+  .iconMini.on:hover{color:var(--acc);border-color:rgba(255,107,53,.8);background:rgba(255,107,53,.22)}
+  /* 换一包：按钮本身就是进度容器 */
+  .packBtn{position:relative;overflow:hidden;isolation:isolate;min-width:88px;text-align:center}
+  .packBtn .packFill{
+    position:absolute;left:0;top:0;bottom:0;width:0;z-index:0;
+    background:linear-gradient(90deg,rgba(255,107,53,.16),rgba(255,107,53,.38));
+    transition:width 1s linear;pointer-events:none;
+  }
+  .packBtn .packTxt{position:relative;z-index:1}
+  /* 下一个：图标按钮同时当轮播进度条 */
+  .nextBtn{position:relative;overflow:visible;isolation:isolate;width:38px}
+  .nextBtn .fillClip{
+    position:absolute;inset:0;border-radius:2px;overflow:hidden;pointer-events:none;
+  }
+  .nextBtn .progFill{
+    position:absolute;left:0;top:0;bottom:0;width:0;
+    background:linear-gradient(90deg,rgba(255,107,53,.18),rgba(255,107,53,.42));
+  }
+  .nextBtn svg{position:relative;z-index:1}
+  .nextBtn .secBadge{
+    position:absolute;top:-6px;right:-7px;z-index:3;
+    min-width:15px;height:14px;padding:0 3px;border-radius:999px;
+    display:grid;place-items:center;
+    background:#141316;border:1px solid rgba(255,107,53,.6);
+    color:var(--acc);font:9px/1 var(--mono);letter-spacing:.02em;
+    pointer-events:none;transition:opacity .2s;
+  }
+  .nextBtn .secBadge.off{opacity:0}
+
+  /* ---------- tabs ---------- */
+  .tabs{
+    position:fixed;bottom:0;left:0;right:0;z-index:30;
+    display:flex;justify-content:center;gap:2px;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    background:rgba(8,8,15,.9);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  }
+  .tab{
+    flex:1;max-width:150px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:7px 4px;border-radius:2px;color:var(--fg3);font-size:11px;
+  }
+  .tab b{font-size:16px;font-weight:400;line-height:1}
+  .tab.on{color:var(--fg);background:rgba(244,81,30,.28);box-shadow:inset 0 0 0 1px rgba(255,107,53,.35)}
+  .tab.on b{color:#FFB38A}
+  .tab .cnt{font-size:9.5px;color:var(--acc)}
+
+  /* ---------- views ---------- */
+  .view{display:none}
+  .view.on{display:block}
+  .sectionHead{display:flex;align-items:baseline;gap:10px;margin:4px 0 16px}
+  .sectionHead h2{margin:0;font-size:16px;font-weight:600}
+  .sectionHead .sub{font-size:12px;color:var(--fg3)}
+  .empty{color:var(--fg3);font-size:13.5px;text-align:center;padding:56px 20px;line-height:1.8}
+  .listCard{
+    display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);
+  }
+  .listCard .meta{flex:1;min-width:0}
+  .listCard .t{font-size:14px;font-weight:550;margin:0 0 4px;line-height:1.45}
+  .listCard .d{font-size:12px;color:var(--fg2);margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .listCard .tags{display:flex;gap:8px;margin-top:6px;font-size:10.5px;color:var(--fg3)}
+  .listCard .tags em{color:var(--acc);font-style:normal}
+  .miniBtn{font-size:11.5px;color:var(--fg3);border:1px solid var(--line);border-radius:2px;padding:4px 9px;flex:none;align-self:flex-start}
+  .miniBtn:hover{color:var(--fg);border-color:var(--line2)}
+  .miniBtn.on{color:var(--warn);border-color:rgba(255,107,107,.35)}
+  .listCard .miniBtn{
+    width:30px;height:30px;padding:0;display:grid;place-items:center;
+    flex:none;align-self:flex-start;
+  }
+  .listCard .miniBtn svg{
+    width:15px;height:15px;display:block;fill:none;stroke:currentColor;
+    stroke-width:1.7;stroke-linejoin:round;
+  }
+  .listCard .miniBtn.on svg{fill:currentColor}
+  .pickModal{max-width:520px}
+  .reviewModal{max-width:640px;width:min(92vw,640px)}
+  .rvCard{
+    border-left:2px solid var(--acc);padding:10px 13px;margin:14px 0 12px;
+    background:rgba(255,255,255,.035);border-radius:0 2px 2px 0;
+  }
+  .rvCard b{display:block;font-size:14px;line-height:1.45;margin-bottom:7px;color:var(--fg)}
+  .rvCard p{margin:0;font-size:12.5px;line-height:1.72;color:var(--fg2);
+    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .rvCard .rvMeta{margin-top:7px;font:10px/1 var(--mono);color:var(--fg3)}
+  .rvOut{max-height:46vh;overflow:auto;font-size:13px;line-height:1.78;color:#DCDCE8}
+  .rvOut h4{margin:14px 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-family:var(--mono)}
+  .rvOut h4:first-child{margin-top:0}
+  .rvOut p{margin:0 0 8px}
+  .rvOut ul{margin:0 0 10px;padding-left:18px}
+  .rvOut li{margin:3px 0}
+  .rvErr{color:var(--warn);font-size:12.5px;line-height:1.7}
+  .pickModal .seg{margin:14px 0 10px;overflow:visible}
+  #pickScope button{position:relative}
+  #pickScope .cnt{
+    position:absolute;top:-6px;right:-3px;min-width:15px;height:15px;padding:0 4px;
+    border-radius:999px;background:var(--acc2);color:#121010;
+    font-size:9px;font-weight:800;line-height:15px;text-align:center;
+    font-family:var(--mono);letter-spacing:0;
+  }
+  #pickScope .cnt:empty{display:none}
+  #pickScope button.on .cnt{background:#FFFFFF}
+  .pickModal #pickSearch{width:100%;background:#0F0F12;border:1px solid var(--line2);border-radius:2px;
+    padding:9px 11px;outline:none;font-size:13px;margin-bottom:10px}
+  .pickModal #pickSearch:focus{border-color:var(--acc)}
+  .pickList{height:min(44vh,360px);overflow-y:auto;border:1px solid var(--line);background:rgba(242,242,242,.015)}
+  .pickItem{
+    display:block;width:100%;text-align:left;padding:10px 12px;
+    border-bottom:1px solid var(--line);color:var(--fg2);transition:.12s;
+  }
+  .pickItem:last-child{border-bottom:0}
+  .pickItem:hover{background:rgba(244,81,30,.1);color:var(--fg)}
+  .pickItem.on{background:rgba(244,81,30,.16);color:var(--fg);box-shadow:inset 2px 0 0 var(--acc2)}
+  .pickItem .pi-d{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#FFB38A;display:block;margin-bottom:3px}
+  .pickItem .pi-t{font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pickEmpty{padding:28px 12px;text-align:center;color:var(--fg3);font-size:12.5px}
+
+  .dataStat{font-size:12px;color:var(--fg2);line-height:1.8;padding:12px 14px;margin-bottom:14px;
+    border:1px solid var(--line);background:rgba(242,242,242,.02)}
+  .dataStat b{color:var(--fg)}
+  .dataActions{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+  .dataActions .btn{width:100%;text-align:center}
+  .dataDanger{border-top:1px solid var(--line);padding-top:14px;margin-bottom:4px}
+  .btn.danger{width:100%;color:var(--warn);border-color:rgba(255,107,107,.3)}
+  .btn.danger:hover{background:rgba(255,107,107,.1)}
+  .btn.danger.armed{background:rgba(255,107,107,.18);color:#fff;border-color:var(--warn)}
+
+  /* ---------- collide ---------- */
+  .collideBox{display:flex;flex-direction:column;gap:16px;align-items:center;padding:10px 0}
+  .pair{display:flex;gap:12px;width:100%;max-width:720px;align-items:stretch}
+  .slot{
+    flex:1;min-height:min(46vh,272px);
+    border:1px dashed var(--line2);border-radius:var(--r);
+    padding:18px;font-size:13px;color:var(--fg3);
+    display:grid;place-items:center;text-align:center;
+    background:linear-gradient(160deg,rgba(255,255,255,.022),rgba(255,255,255,.006));
+    transition:border-color .15s,background .15s;
+  }
+  .slot:hover{border-color:rgba(255,107,53,.45);background:rgba(255,107,53,.04)}
+  .slot.filled{
+    color:var(--fg);border-style:solid;text-align:left;
+    display:flex;flex-direction:column;gap:9px;justify-content:center;
+    background:linear-gradient(160deg,#17151a,rgba(16,15,18,.9));
+  }
+  .slot.filled:hover{border-color:var(--line2);background:linear-gradient(160deg,#17151a,rgba(16,15,18,.9))}
+  .slot .sl-d{font-size:10.5px;color:var(--acc);letter-spacing:.06em;text-transform:uppercase}
+  .slot .sl-t{font-size:14.5px;font-weight:550;line-height:1.5}
+  .x{display:grid;place-items:center;color:var(--fg3);font-size:18px;flex:none;width:24px}
+  .out{
+    width:100%;max-width:760px;border:1px solid var(--line2);border-radius:var(--r);
+    padding:18px 20px;font-size:13.5px;line-height:1.78;color:#DCDCE8;
+    background:linear-gradient(160deg,#141312,#101010);
+  }
+  .out:empty{display:none}
+
+  /* ---------- markdown 渲染 ---------- */
+  .md-body{font-size:13.8px;line-height:1.82;color:#DCDCE8}
+  .md-body h4{
+    margin:20px 0 9px;font-size:13.5px;color:var(--acc);font-weight:650;
+    letter-spacing:.03em;font-family:var(--sans);
+  }
+  .md-body h4:first-child{margin-top:0}
+  .md-body p{margin:0 0 13px}
+  .md-body p:last-child{margin-bottom:0}
+  .md-body strong{color:#FFFFFF;font-weight:750}
+  .md-body em{color:#FFD6C4;font-style:normal;border-bottom:1px solid rgba(255,107,53,.55)}
+  .md-body code{
+    background:rgba(255,107,53,.16);color:#FFD6C4;padding:1px 5px;border-radius:2px;
+    font-size:12.2px;font-family:ui-monospace,Consolas,monospace;
+  }
+  .md-body ul{margin:0 0 13px;padding-left:19px}
+  .md-body li{margin:5px 0}
+  .md-body li::marker{color:rgba(255,107,53,.7)}
+  .md-body .arrow{color:var(--acc);padding:0 4px;font-weight:600}
+  .md-body .numbadge{
+    display:inline-grid;place-items:center;width:19px;height:19px;border-radius:2px;
+    background:rgba(255,107,53,.2);color:#FFD6C4;font-size:11px;font-weight:650;
+    margin-right:7px;vertical-align:1px;
+  }
+
+  /* ---------- 碰撞记录 ---------- */
+  .collideHist{width:100%;max-width:760px;margin-top:6px}
+  .collideHist h3{font-size:12.5px;color:var(--fg3);font-weight:600;margin:22px 0 10px;letter-spacing:.03em}
+  .ci{border-bottom:1px solid var(--line);padding:11px 0}
+  .ci:last-child{border-bottom:0}
+  .ciHead{display:flex;align-items:baseline;gap:7px;cursor:pointer;font-size:12.5px;color:var(--fg2);line-height:1.5}
+  .ciHead .a,.ciHead .b{color:#DCDCE8;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42%}
+  .ciHead .x{color:var(--acc);flex:none}
+  .ciHead .t{margin-left:auto;flex:none;font-size:10.5px;color:var(--fg3)}
+  .ciBody{display:none;margin-top:12px;padding:14px 16px;border-radius:2px;background:rgba(255,255,255,.025)}
+  .ci.open .ciBody{display:block}
+
+  /* ---------- modal ---------- */
+  .mask{position:fixed;inset:0;background:rgba(6,8,12,.72);backdrop-filter:blur(4px);
+    z-index:100;display:none;align-items:center;justify-content:center;padding:18px}
+  .mask.on{display:flex}
+  .modal{
+    width:100%;max-width:440px;background:var(--bg2);border:1px solid rgba(255,107,53,.35);
+    border-radius:4px;padding:22px;max-height:88vh;overflow-y:auto;
+    box-shadow:0 40px 100px -40px rgba(244,81,30,.9);
+  }
+  .modal h3{margin:0 0 4px;font-size:16px}
+  .modal .note{font-size:12px;color:var(--fg3);margin:0 0 18px;line-height:1.6}
+  /* 设置：左侧 tab + 右侧内容 */
+  .settingsModal{
+    max-width:800px;width:100%;padding:0;overflow:hidden;
+    display:flex;flex-wrap:wrap;align-content:flex-start;
+  }
+  .setTabs{
+    width:158px;flex:none;display:flex;flex-direction:column;gap:1px;
+    padding:16px 0;border-right:1px solid var(--line);background:rgba(0,0,0,.18);
+  }
+  .setTabs button{
+    text-align:left;padding:11px 18px;font-size:13px;color:var(--fg2);
+    border-left:2px solid transparent;transition:.15s;
+  }
+  .setTabs button:hover{color:var(--fg);background:rgba(242,242,242,.035)}
+  .setTabs button.on{color:var(--fg);border-left-color:var(--acc2);background:rgba(244,81,30,.1)}
+  .mdlList{display:flex;flex-direction:column;gap:6px;margin:0 0 9px}
+  .mdlItem{
+    display:flex;align-items:center;gap:9px;padding:9px 11px;
+    border:1px solid var(--line);border-radius:2px;background:none;
+    cursor:pointer;transition:.15s;text-align:left;width:100%;
+  }
+  .mdlItem:hover{border-color:var(--line2);background:rgba(255,255,255,.02)}
+  .mdlItem.on{border-color:rgba(255,107,53,.6);background:rgba(255,107,53,.07)}
+  .mdlItem.editing{box-shadow:inset 2px 0 0 var(--acc)}
+  .mdlItem .mn{flex:1;min-width:0}
+  .mdlItem .mn b{display:block;font-size:12.5px;font-weight:600;color:var(--fg);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mdlItem .mn span{display:block;font:10px/1.5 var(--mono);color:var(--fg3);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mdlItem .badge2{
+    flex:none;font-size:9.5px;letter-spacing:.04em;padding:2px 6px;border-radius:2px;
+    border:1px solid rgba(255,107,53,.55);color:var(--acc);background:rgba(255,107,53,.12);
+  }
+  .mdlItem .badge2.warn{border-color:rgba(255,107,107,.4);color:var(--warn);background:rgba(255,107,107,.1)}
+  .mdlItem .del{
+    flex:none;width:22px;height:22px;display:grid;place-items:center;
+    border:0;border-radius:2px;background:none;color:var(--fg3);
+    font-size:14px;line-height:1;cursor:pointer;transition:.12s;
+  }
+  .mdlItem .del:hover{color:var(--warn);background:rgba(255,107,107,.14)}
+  .mdlAdd{width:100%}
+  .mdlEditor{display:none;border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
+  .mdlEditor.on{display:block}
+  .keyRow{display:flex;gap:7px;align-items:stretch}
+  .keyRow input{flex:1;min-width:0}
+  .keyEye{
+    flex:none;width:34px;display:grid;place-items:center;
+    border:1px solid var(--line);border-radius:2px;background:none;
+    color:var(--fg3);cursor:pointer;transition:.15s;
+  }
+  .keyEye svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7}
+  .keyEye:hover{color:var(--fg);border-color:var(--line2)}
+  .keyEye.off{color:var(--fg2);background:rgba(255,107,53,.1);border-color:rgba(255,107,53,.4)}
+  .mdlCancel{width:100%;margin-top:8px}
+  .mdlBtns{display:flex;gap:8px}
+  .mdlBtns .btn{flex:1;width:auto}
+  .setBody{flex:1;min-width:0;padding:20px 24px;height:min(62vh,470px);overflow-y:auto}
+  .setPane{display:none}
+  .setPane.on{display:block}
+  .setFooter{width:100%;margin:0;padding:14px 24px;border-top:1px solid var(--line);
+    justify-content:flex-end;gap:8px}
+  .hintInline{color:rgba(242,242,242,.38)}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11.5px;color:var(--fg2);margin-bottom:6px}
+  .field input{
+    width:100%;background:#101010;border:1px solid var(--line2);border-radius:2px;
+    padding:9px 11px;outline:none;font-size:13px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  .field input:focus{border-color:var(--acc)}
+  .row{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+  .btn{padding:9px 18px;border-radius:2px;font-size:13.5px;border:1px solid var(--line2);color:var(--fg2)}
+  .btn:hover{color:var(--fg)}
+  .btn.primary{background:linear-gradient(135deg,#FF8A5B,#F4511E);color:#F2F2F2;border:0;font-weight:600}
+  .ratioRow{display:flex;align-items:center;gap:10px}
+  .ratioRow input[type=range]{flex:1;accent-color:var(--acc)}
+  .ratioVal{font-family:ui-monospace,monospace;font-size:12.5px;color:var(--acc);min-width:44px;text-align:right}
+  .chk{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--fg2);cursor:pointer;line-height:1.5}
+  .chk input{accent-color:var(--acc);width:15px;height:15px;flex:none}
+  .testOut{margin-top:9px;font-size:11.5px;line-height:1.65;color:var(--fg2);word-break:break-word;min-height:0}
+
+  .seg{display:flex;gap:4px;background:#101010;border:1px solid var(--line2);border-radius:2px;padding:4px}
+  .seg button{flex:1;padding:7px 4px;border-radius:2px;font-size:12px;color:var(--fg2);transition:.15s}
+  .seg button:hover{color:var(--fg)}
+  .seg button.on{background:rgba(255,107,53,.18);color:#fff;font-weight:600}
+  .segHint{font-size:11.5px;color:var(--fg3);line-height:1.55;margin-top:8px;min-height:36px}
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:84px;transform:translate(-50%,14px);
+    background:#1A1917;border:1px solid var(--line2);color:var(--fg);
+    padding:9px 16px;border-radius:2px;font-size:12.5px;opacity:0;pointer-events:none;
+    transition:.22s;z-index:200;max-width:86vw;text-align:center;
+  }
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+
+  .loading{display:flex;justify-content:center;padding:40px 0;gap:6px}
+  .loading i{width:7px;height:7px;border-radius:50%;background:var(--acc);animation:b 1.1s infinite ease-in-out}
+  .loading i:nth-child(2){animation-delay:.16s}
+  .loading i:nth-child(3){animation-delay:.32s}
+  @keyframes b{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-5px)}}
+
+  @media (max-width:520px){
+    main{padding:16px 12px 92px}
+    .grid{grid-template-columns:repeat(2,1fr);gap:10px}
+    .card{height:206px}
+    .hero{padding:18px 0 22px}
+    .hero h1{font-size:21px}
+    .brand{font-size:14px}
+    .pill{display:none}
+    .themeWrap .modelWrap{display:none}
+    .deck{height:min(58vh,448px)}
+    .slide{width:min(78vw,436px)}
+    .slide .face{--px:20px;--py:18px;padding:var(--py) var(--px)}
+    .slide .title{font-size:19px}
+    .slide .body{font-size:15px}
+    .orbit.focus .bubble{width:min(90vw,520px);height:min(76vh,504px)}
+    .card2 h3{font-size:21px}
+    .card2 p{font-size:14.5px;line-height:1.7}
+    .navBtn{display:none}
+    .settingsModal{flex-direction:column}
+    .setTabs{width:100%;flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:0}
+    .setTabs button{flex:1;text-align:center;border-left:0;border-bottom:2px solid transparent;padding:11px 6px}
+    .setTabs button:hover{background:none}
+    .setTabs button.on{border-left:0;border-bottom-color:var(--acc2);background:rgba(244,81,30,.1)}
+    .setBody{flex:none;height:min(52vh,400px);padding:16px 18px}
+    .thumb{flex:0 0 92px;max-width:none}
+    .slot{min-height:min(34vh,192px);padding:14px}
+    .slot .sl-t{font-size:13.5px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">灵感<span>引擎</span></div>
+  <div class="themeWrap">
+    <input id="theme" placeholder="主题 · 可留空" maxlength="30" autocomplete="off">
+  <div class="modelWrap" id="modelWrap">
+    <button class="modelTag" id="modelTag" title="当前模型">—</button>
+    <div class="modelMenu" id="modelMenu">
+      <div class="modelList" id="modelMenuList"></div>
+      <div class="modelSep"></div>
+      <button class="modelCfg" id="modelCfg"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.64 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg><span>配置模型</span></button>
+    </div>
+  </div>
+    <span class="pill" id="ratioPill"><b id="ratioNum" title="主题占几条（点击调整）">6/10</b><i class="pillDot">·</i><span id="modeTag" title="取材方式（点击切换）">C</span></span>
+    <div class="themeMenu" id="themeMenu"></div>
+  </div>
+  <button class="iconBtn" id="btnFavNav" title="收藏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.3l2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9z"/></svg><span class="badge" id="favBadge"></span></button>
+  <button class="iconBtn" id="btnHistNav" title="历史">≡<span class="badge" id="histBadge"></span></button>
+  <button class="iconBtn" id="btnSettings" title="设置">⚙</button>
+</header>
+
+<main>
+  <!-- 抽卡 -->
+  <section class="view on" id="view-draw">
+    <div class="hero" id="hero">
+      <div class="kicker">10 CARDS · ONE DRAW</div>
+      <h1>抽一包，看看脑子里冒出什么</h1>
+      <p>无聊时按一下。10 条来自不相干领域的火花，每条都是一个能勾住你的钩子。点开看，喜欢的收进灵感库。</p>
+      <button class="drawBtn" id="btnDraw">抽一包</button>
+      <div class="hint" id="hintText">未配置 API · 会先用演示数据</div>
+    </div>
+    <div id="drawArea"></div>
+  </section>
+
+  <!-- 收藏 -->
+  <section class="view" id="view-fav">
+    <div class="sectionHead">
+      <h2>灵感库</h2>
+      <span class="sub" id="favSub"></span>
+    </div>
+    <div id="favList"></div>
+  </section>
+
+  <!-- 历史 -->
+  <section class="view" id="view-hist">
+    <div class="sectionHead">
+      <h2>抽过的</h2>
+      <span class="sub" id="histSub"></span>
+    </div>
+    <input id="search" placeholder="搜索标题、领域…" autocomplete="off"
+      style="width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:2px;padding:9px 12px;outline:none;margin-bottom:8px;font-size:13px">
+    <div class="histFilter" id="histFilter">
+      <div class="histTabs" id="histTabs"></div>
+      <button class="histMore" id="histMore" title="其他主题"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+      <div class="histMoreMenu" id="histMoreMenu"></div>
+    </div>
+    <div id="histList"></div>
+  </section>
+
+  <!-- 碰撞 -->
+  <section class="view" id="view-collide">
+    <div class="sectionHead">
+      <h2>碰撞</h2>
+      <span class="sub">两张卡撞一下，看能撞出什么</span>
+    </div>
+    <div class="collideBox">
+      <div class="pair">
+        <div class="slot" id="slotA">点「随机两张」<br>或从收藏里挑</div>
+        <div class="x">×</div>
+        <div class="slot" id="slotB">从灵感库随机取</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="miniBtn" id="btnPair">随机两张</button>
+        <button class="miniBtn" id="btnCollide">撞一下</button>
+      </div>
+      <div class="out" id="collideOut"></div>
+      <div class="collideHist" id="collideHist"></div>
+    </div>
+  </section>
+  <!-- 泡泡 -->
+  <section class="view" id="view-bubble">
+    <div class="bubbleStage" id="bubbleStage"></div>
+    <div class="bubbleBar">
+      <span class="themeChip" id="bubbleTheme"></span>
+      <span id="bubbleInfo"></span>
+      <button class="iconMini" id="btnBubbleHelp" title="说明" aria-label="说明"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.3a2.4 2.4 0 1 1 3.2 2.2c-.7.3-1 .9-1 1.6v.3"/><circle cx="11.9" cy="16.6" r="1" fill="currentColor" stroke="none"/></svg></button>
+      <button class="iconMini" id="btnBubblePrev" title="上一个" aria-label="上一个"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="iconMini nextBtn" id="btnBubbleNext" title="下一个" aria-label="下一个"><span class="fillClip"><i class="progFill" id="nextFill" aria-hidden="true"></i></span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg><b class="secBadge" id="nextBadge" aria-hidden="true"></b></button>
+      <button class="iconMini fill" id="btnBubblePause" title="暂停" aria-label="暂停"><svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1"/></svg></button>
+      <button class="miniBtn packBtn" id="btnBubbleNew" title="换一包"><i class="packFill" id="packFill" aria-hidden="true"></i><span class="packTxt">换一包</span></button>
+      <div class="bubbleTip" id="bubbleTip">
+        <p>灵感泡泡转瞬即逝，所以会消失。</p>
+        <p><b id="tipRotate">每 1 分钟换一个</b> · <b id="tipPack">30 分钟换一包</b></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button class="tab on" data-view="draw"><b>▤</b>抽卡</button>
+  <button class="tab" data-view="bubble"><b>◌</b>泡泡</button>
+  <button class="tab" data-view="collide"><b>✳</b>碰撞</button>
+</nav>
+
+<!-- 选卡（碰撞用） -->
+<div class="mask" id="pickMask">
+  <div class="modal pickModal">
+    <h3>选一张卡</h3>
+    <p class="note">从当前卡包、收藏或全部历史里挑一张来碰撞。</p>
+    <div class="seg" id="pickScope">
+      <button data-scope="pack">当前卡包<span class="cnt"></span></button>
+      <button data-scope="fav">收藏<span class="cnt"></span></button>
+      <button data-scope="all">历史<span class="cnt"></span></button>
+    </div>
+    <input id="pickSearch" placeholder="搜索标题、领域…" autocomplete="off">
+    <div class="pickList" id="pickList"></div>
+    <div class="row">
+      <button class="btn" id="btnPickCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 单卡审查 -->
+<div class="mask" id="reviewMask">
+  <div class="modal reviewModal">
+    <h3>审查这张卡</h3>
+    <div class="rvCard" id="rvCard"></div>
+    <div class="rvOut" id="rvOut"></div>
+    <div class="row">
+      <button class="btn primary" id="btnRvApply" style="display:none">应用改写</button>
+      <button class="btn" id="btnRvClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="mask" id="mask">
+  <div class="modal settingsModal">
+    <div class="setTabs" id="setTabs">
+      <button data-tab="model" class="on">模型</button>
+      <button data-tab="gen">生成</button>
+      <button data-tab="data">数据</button>
+    </div>
+
+    <div class="setBody">
+      <!-- 模型 -->
+      <div class="setPane on" id="pane-model">
+        <div class="field">
+          <label>已配置的模型</label>
+          <div class="mdlList" id="mdlList"></div>
+          <button class="btn mdlAdd" id="btnModelAdd">+ 添加模型</button>
+        </div>
+
+        <div class="mdlEditor" id="mdlEditor">
+          <div class="field">
+            <label>名称 <span class="hintInline">（可选，只用来在这个列表里区分）</span></label>
+            <input id="cfgLabel" placeholder="DeepSeek 云端 / 本地 Ollama…" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>服务预设</label>
+            <div class="seg" id="cfgPreset">
+              <button data-preset="deepseek">DeepSeek</button>
+              <button data-preset="lmstudio">LM Studio</button>
+              <button data-preset="ollama">Ollama</button>
+              <button data-preset="opencode">OpenCode Go</button>
+              <button data-preset="custom">自定义</button>
+            </div>
+            <div class="segHint" id="presetHint"></div>
+          </div>
+          <p class="note">任意 OpenAI 兼容接口。本地模型（LM Studio / Ollama / Unsloth Studio）的
+            Base URL 填它们显示的地址，API Key 留空即可。注意 <code>/anthropic</code> 是 Anthropic 协议，
+            本应用走 OpenAI 协议，填了会失败。</p>
+          <div class="field">
+            <label>Base URL</label>
+            <input id="cfgBase" list="baseList" placeholder="https://api.deepseek.com">
+            <datalist id="baseList">
+              <option value="https://api.deepseek.com"></option>
+              <option value="https://api.deepseek.com/v1"></option>
+              <option value="http://localhost:1234/v1"></option>
+              <option value="http://localhost:11434/v1"></option>
+              <option value="http://localhost:8888/v1"></option>
+            <option value="https://opencode.ai/zen/v1"></option>
+            </datalist>
+          </div>
+          <div class="field">
+            <label>Model</label>
+            <input id="cfgModel" list="modelList" placeholder="deepseek-flash">
+            <datalist id="modelList">
+              <option value="deepseek-flash"></option>
+              <option value="deepseek-v4-pro"></option>
+              <option value="gpt-6-luna"></option>
+              <option value="gpt-6-astra"></option>
+              <option value="glm-5.3"></option>
+              <option value="glm-5.3-flash"></option>
+              <option value="kimi-k3"></option>
+              <option value="kimi-k2.7-code"></option>
+              <option value="claude-haiku-5.5"></option>
+            </datalist>
+          </div>
+          <div class="field">
+            <label>API Key</label>
+            <div class="keyRow">
+              <input id="cfgKey" type="text" placeholder="sk-…（本地模型留空）" autocomplete="off" spellcheck="false">
+              <button class="keyEye" id="btnKeyEye" type="button" title="隐藏 / 显示">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12S5.8 5.5 12 5.5 21.8 12 21.8 12 18.2 18.5 12 18.5 2.2 12 2.2 12z"/><circle cx="12" cy="12" r="3.1"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="chk"><input type="checkbox" id="cfgThinking"> 思考模式（DeepSeek 专有：thinking + reasoning_effort=high）</label>
+          </div>
+          <div class="field">
+            <div class="mdlBtns">
+              <button class="btn" id="btnTest">测试连接</button>
+              <button class="btn primary" id="btnModelSave">保存并使用</button>
+            </div>
+            <button class="btn mdlCancel" id="btnModelCancel">收起</button>
+            <div class="testOut" id="testOut"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 生成 -->
+      <div class="setPane" id="pane-gen">
+        <div class="field">
+          <label>主题相关比例 <span class="hintInline">（有主题时，10 条里有几条相关）</span></label>
+          <div class="ratioRow">
+            <input type="range" id="cfgRatio" min="0" max="10" step="1">
+            <span class="ratioVal" id="cfgRatioVal">6</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="chk"><input type="checkbox" id="cfgReview"> 生成后自动审查并改写（多一次模型调用，会慢 20–40 秒）</label>
+        </div>
+        <div class="field">
+          <label>相关内容的取材方式</label>
+          <div class="seg" id="cfgMode">
+            <button data-mode="A">A 直接</button>
+            <button data-mode="B">可迁移</button>
+            <button data-mode="C">跨领域</button>
+          </div>
+          <div class="segHint" id="modeHint"></div>
+        </div>
+        <div class="field">
+          <label>泡泡轮播 <span class="hintInline">（秒，切到下一个泡泡）</span></label>
+          <div class="ratioRow">
+            <input type="range" id="cfgRotate" min="10" max="180" step="5">
+            <span class="ratioVal" id="cfgRotateVal">60</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>自动换包 <span class="hintInline">（分钟，0 = 关闭）</span></label>
+          <div class="ratioRow">
+            <input type="range" id="cfgRefresh" min="0" max="120" step="5">
+            <span class="ratioVal" id="cfgRefreshVal">30</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数据 -->
+      <div class="setPane" id="pane-data">
+        <div class="dataStat" id="dataStat"></div>
+        <div class="dataActions">
+          <button class="btn" id="btnExportJSON">备份全部数据</button>
+          <button class="btn" id="btnImport">恢复备份</button>
+          <button class="btn" id="btnExport">导出 Markdown</button>
+        </div>
+        <input type="file" id="fileImport" accept="application/json,.json" hidden>
+        <div class="dataDanger">
+          <button class="btn danger" id="btnWipe">清空所有数据</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row setFooter">
+      <button class="btn" id="btnCancel">取消</button>
+      <button class="btn primary" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============ 状态 ============ */
+const LS_CARDS = "kg_cards_v1";
+const LS_CFG   = "kg_cfg_v1";
+const LS_COLLIDES = "kg_collides_v1";
+
+const DEFAULT_CFG = {
+  base: "https://api.deepseek.com",
+  model: "deepseek-flash",
+  key: "",
+  ratio: 6, mode: "C", rotateSec: 60, refreshMin: 30, thinking: false, review: true,
+};
+
+/* 三种取材方式：A 直接相关 / B 可迁移视角 / C 跨领域隐喻 */
+const MODE_INFO = {
+  A: { name:"直接", hint:"直接讲主题本身：工具、API、版本变化、生态现状、常见坑。硬知识，拿来就用，但不容易撞出新点子。" },
+  B: { name:"可迁移", hint:"讲主题背后的机制与权衡：类型、内存、并发、编译、错误处理、依赖管理。读完能改掉一个默认写法。" },
+  C: { name:"跨领域", hint:"从完全不相干的领域取材，但底层机制和主题同构。最容易产生「原来是同一件事」的联想。" },
+};
+const MODE_ORDER = ["A", "B", "C"];
+
+function modeRule(theme, related, mode){
+  if(mode === "A"){
+    return "6) 这 " + related + " 条直接讲「" + theme + "」本身：具体工具、API 用法、版本变化、生态现状、常见坑。" +
+           "要硬事实和可操作细节，不要泛泛而谈。";
+  }
+  if(mode === "B"){
+    return "6) 这 " + related + " 条讲「" + theme + "」背后可迁移的机制与设计权衡：类型系统、内存模型、并发语义、编译优化、错误处理哲学、依赖与包管理的历史。" +
+           "不写具体工具和版本，写原理和取舍。读完每一条，应该能改掉一个「" + theme + "」里的默认写法。";
+  }
+  return "6) 这 " + related + " 条来自与「" + theme + "」完全不相干的领域（生物学、建筑、物流、语言学、制度设计等），但底层机制与「" + theme + "」的某个核心问题同构。\n" +
+         "   每条必须点明对应关系：某领域的 X 机制 ↔ 「" + theme + "」里的 Y 机制。不要只写「类似」「可以类比」。\n" +
+         "   这类卡片的 body 允许放宽到 3-4 句，但必须把对应关系写清楚：先说该领域的机制，再指认它对应「" + theme + "」里的什么。\n" +
+         "   参考（不要复用这些具体例子）：免疫耐受 ↔ 所有权约束；建筑伸缩缝 ↔ 缓冲设计；物流安全库存 ↔ 背压；语法化 ↔ API 演进。";
+}
+
+function modeExtraRule(theme, related, mode){
+  if(mode === "C"){
+    return "7) 注意：C 模式下，「相关」不等于领域相同，而是机制瞄准主题。相关的 " + related + " 条心里要对准「" + theme + "」的一个具体问题；" +
+           "无关的 " + (10-related) + " 条完全放开，不要去硬联想主题。";
+  }
+  return "7) 不要为了凑相关性而硬编。宁可解释一个更本质的机制，也不要堆砌术语。";
+}
+
+const S = {
+  cards: [],
+  cfg: {...DEFAULT_CFG},
+  current: [],
+  pair: [null, null],
+  view: "draw",
+  busy: false,
+  slide: 0,
+  collides: [],
+};
+
+function load(){
+  try{ S.cards = JSON.parse(localStorage.getItem(LS_CARDS) || "[]") || []; }catch(e){ S.cards = []; }
+  try{ S.cfg = Object.assign({...DEFAULT_CFG}, JSON.parse(localStorage.getItem(LS_CFG) || "{}")); }catch(e){ S.cfg = {...DEFAULT_CFG}; }
+  try{ S.collides = JSON.parse(localStorage.getItem(LS_COLLIDES) || "[]") || []; }catch(e){ S.collides = []; }
+  // 旧版默认 10 秒读不完，迁移到 1 分钟
+  if(S.cfg.rotateSec === 10) S.cfg.rotateSec = 60;
+  // 地址和模型留空的，补成 DeepSeek 默认值，用户只需要填 key
+  if(!S.cfg.base)  S.cfg.base  = DEFAULT_CFG.base;
+  if(!S.cfg.model) S.cfg.model = DEFAULT_CFG.model;
+}
+function saveCards(){ localStorage.setItem(LS_CARDS, JSON.stringify(S.cards)); }
+function saveCfg(){ localStorage.setItem(LS_CFG, JSON.stringify(S.cfg)); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ============ 工具 ============ */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let toastTimer;
+function toast(msg){
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("on"), 2200);
+}
+
+/* ============ LLM ============ */
+/* 兼容三种写法：https://host 、https://host/v1 、完整 .../chat/completions */
+function endpointOf(base){
+  const b = String(base || "").trim().replace(/\/+$/, "");
+  if(!b) return "";
+  return /\/chat\/completions$/i.test(b) ? b : b + "/chat/completions";
+}
+
+async function chat(messages, opts={}){
+  const {base, model, key} = S.cfg;
+  if(!base || !model) throw new Error("NO_API");
+
+  const url = endpointOf(base);
+  const body = {
+    model,
+    messages,
+    temperature: opts.temperature ?? 0.95,
+  };
+  // DeepSeek 的思考模式：不显式关闭的话，flash 这类模型可能默认开，
+  // 思考会把 max_tokens 吃光，正文 JSON 根本生成不出来。
+  const thinking = opts.thinking ?? !!S.cfg.thinking;
+  const isDeepSeek = /deepseek/i.test(S.cfg.base + " " + model);
+  if(isDeepSeek){
+    body.thinking = { type: thinking ? "enabled" : "disabled" };
+    if(thinking) body.reasoning_effort = "high";
+  }else if(thinking){
+    body.reasoning_effort = "high";
+  }
+  if(opts.maxTokens) body.max_tokens = thinking ? opts.maxTokens * 2 : opts.maxTokens;
+
+  const ac = new AbortController();
+  const timer = setTimeout(()=>ac.abort(), 180000);
+
+  const send = payload => fetch(url, {
+    method:"POST",
+    headers: Object.assign(
+      { "Content-Type": "application/json" },
+      key ? { "Authorization": "Bearer " + key } : {}
+    ),
+    body: JSON.stringify(payload),
+    signal: ac.signal,
+  });
+
+  let res;
+  try{
+    res = await send(body);
+
+    // 有些 endpoint 不认 thinking / reasoning_effort，会 400。去掉这两个字段重试一次。
+    if(res.status === 400 && body.thinking){
+      const probe = await res.clone().text();
+      if(/thinking|reasoning_effort|unknown.*field|unexpected/i.test(probe)){
+        const retry = {...body};
+        delete retry.thinking;
+        delete retry.reasoning_effort;
+        res = await send(retry);
+      }
+    }
+  }catch(err){
+    clearTimeout(timer);
+    if(err.name === "AbortError") throw new Error("请求超时（180s）。本地模型首次加载很慢，可以先在 LM Studio / Ollama 里预热。");
+    throw new Error("网络请求失败。可能是 CORS 或地址不对。");
+  }
+  clearTimeout(timer);
+
+  if(!res.ok){
+    const txt = await res.text().catch(()=> "");
+    let detail = txt.slice(0, 200);
+    try{
+      const j = JSON.parse(txt);
+      detail = j?.error?.message || j?.message || detail;
+    }catch(e){ /* 非 JSON 错误体，原样显示 */ }
+    const tip = res.status === 401 ? "（key 不对）"
+              : res.status === 402 ? "（余额不足）"
+              : res.status === 404 ? "（地址或模型名不对）"
+              : res.status === 400 ? "（参数或模型名不被接受）"
+              : res.status === 429 ? "（限流或额度用尽）" : "";
+    throw new Error("API " + res.status + tip + "：" + detail);
+  }
+
+  const data = await res.json();
+  markModelVerified();
+  const choice = data?.choices?.[0];
+  if(!choice){
+    throw new Error("返回里没有 choices，这个接口可能不是 OpenAI 兼容格式。原始响应：" + JSON.stringify(data).slice(0, 180));
+  }
+  const msg = choice?.message || {};
+  let content = msg.content;
+  const finish = choice?.finish_reason;
+
+  // 有些 provider 把 completion 放在 text 字段
+  if(!content || !String(content).trim()){
+    if(choice?.text) content = choice.text;
+  }
+
+  // 关键：content 为空但 reasoning_content 有东西 = 模型只思考没作答。
+  // 这时绝不能把思考过程当答案，否则会送去解析 JSON，报一个毫不相干的错。
+  const hasReasoning = !!(msg.reasoning_content && String(msg.reasoning_content).trim());
+  if((!content || !String(content).trim()) && hasReasoning){
+    throw new Error(
+      "模型只输出了思考过程，正文没生成（finish_reason=" + (finish || "未知") + "）。" +
+      "这是思考型模型把 max_tokens 用光了：到设置里关掉「思考模式」，或换成 deepseek-chat 这类非推理模型。"
+    );
+  }
+
+  if(!content || !String(content).trim()){
+    const why = finish === "length"
+      ? "（finish_reason=length：输出被 max_tokens 截断）"
+      : "";
+    throw new Error("API 返回为空" + why + "。原始响应：" + JSON.stringify(data).slice(0, 160));
+  }
+
+  return content;
+}
+
+/* 尽量把模型返回的烂 JSON 捞回来：markdown 包裹 / 前后废话 / 截断 / 尾逗号 / 中文引号 */
+function tidyJSON(x){
+  return String(x)
+    .replace(/^\uFEFF/, "")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([\]}])/g, "$1");
+}
+
+/* 截断修复：找到最后一个完整的对象，补上右方括号 */
+function salvageArray(t){
+  const a = t.indexOf("[");
+  if(a < 0) return null;
+  let depth = 1, inStr = false, esc = false, lastClose = -1;
+  for(let i = a + 1; i < t.length; i++){
+    const ch = t[i];
+    if(esc){ esc = false; continue; }
+    if(ch === "\\"){ esc = true; continue; }
+    if(ch === '"'){ inStr = !inStr; continue; }
+    if(inStr) continue;
+    if(ch === "{" || ch === "[") depth++;
+    else if(ch === "}" || ch === "]"){
+      depth--;
+      if(depth === 0) return t.slice(a, i + 1);
+      if(depth === 1 && ch === "}") lastClose = i;
+    }
+  }
+  if(lastClose > a) return t.slice(a, lastClose + 1) + "]";
+  return null;
+}
+
+/* 从解析结果里找出卡片数组：直接是数组，或被 cards/items/data 包了一层 */
+function pickArray(v){
+  if(Array.isArray(v)) return v;
+  if(v && typeof v === "object"){
+    for(const k of ["cards","items","data","list","result","results"]){
+      if(Array.isArray(v[k])) return v[k];
+    }
+    for(const k of Object.keys(v)){
+      if(Array.isArray(v[k])) return v[k];
+    }
+  }
+  return null;
+}
+
+function extractJSON(text){
+  const raw = String(text || "");
+  let t = raw.trim();
+
+  // 1) 剥 markdown 代码块，取最长的一段
+  const fences = [...t.matchAll(/```(?:json|JSON)?\s*([\s\S]*?)```/g)].map(m => m[1]);
+  if(fences.length){
+    t = fences.sort((a, b) => b.length - a.length)[0].trim();
+  }
+
+  const cands = [];
+  const push = x => { if(x && !cands.includes(x)) cands.push(x); };
+
+  // 2) 数组切片 / 对象切片 / 整段 / 截断修复
+  const a = t.indexOf("["), b = t.lastIndexOf("]");
+  if(a >= 0 && b > a) push(t.slice(a, b + 1));
+  const oa = t.indexOf("{"), ob = t.lastIndexOf("}");
+  if(oa >= 0 && ob > oa) push(t.slice(oa, ob + 1));
+  push(t);
+  const sal = salvageArray(t);
+  if(sal) push(sal);
+
+  for(const c of cands){
+    try{
+      const v = JSON.parse(tidyJSON(c));
+      const arr = pickArray(v);
+      if(arr && arr.length) return arr;
+    }catch(e){ /* 换下一个候选 */ }
+  }
+
+  // 最后兜底：JSONL（一行一个对象，没有外层数组）
+  const lines = t.split(/\n+/).map(x => x.trim()).filter(x => x.startsWith("{") && x.endsWith("}"));
+  if(lines.length){
+    const arr = [];
+    for(const ln of lines){
+      try{ const o = JSON.parse(tidyJSON(ln)); if(o && typeof o === "object" && o.title) arr.push(o); }catch(e){}
+    }
+    if(arr.length) return arr;
+  }
+
+  throw new Error("无法解析模型返回的 JSON。原文开头：" +
+    raw.trim().slice(0, 200).replace(/\s+/g, " "));
+}
+
+/* 单个对象的解析（审查结果用），extractJSON 只处理数组 */
+function extractObject(text){
+  const raw = String(text || "").trim();
+  let t = raw;
+  const fences = [...t.matchAll(/```(?:json|JSON)?\s*([\s\S]*?)```/g)].map(m => m[1]);
+  if(fences.length) t = fences.sort((a, b) => b.length - a.length)[0].trim();
+
+  const cands = [];
+  const oa = t.indexOf("{"), ob = t.lastIndexOf("}");
+  if(oa >= 0 && ob > oa) cands.push(t.slice(oa, ob + 1));
+  cands.push(t);
+  const lines = t.split(/\n+/).map(x => x.trim()).filter(x => x.startsWith("{") && x.endsWith("}"));
+
+  for(const c of cands.concat(lines)){
+    try{
+      const v = JSON.parse(tidyJSON(c));
+      const o = Array.isArray(v) ? v[0] : v;
+      if(o && typeof o === "object" && !Array.isArray(o)) return o;
+    }catch(e){ /* 换下一个 */ }
+  }
+  return null;
+}
+
+/* ============ Prompt ============ */
+function recentTitles(n=60){
+  return S.cards.slice(-n).map(c => c.title).filter(Boolean);
+}
+
+/* ============ 生成后审查 ============ */
+function buildReviewPrompt(items){
+  const slim = items.map(c => ({ title:c.title, body:c.body, domain:c.domain, source:c.source }));
+  return [
+    "你是严格的内容审查员。下面 " + slim.length + " 张灵感卡需要逐条审查：不合格的改写，合格的保留原文。",
+    "",
+    "审查标准：",
+    "1. 标题：把答案填进去读起来像废话的（「越堵越慢」「熬夜会困」），必须重写标题。",
+    "2. 数字：每个百分比、年份、金额、时长都必须带上可核验的主体（机构名 / 法规编号 / 论文或报告名）。",
+    "   找不到出处的，删掉数字，改写成机制描述，不要保留凭空的具体数字。",
+    "3. 反直觉：正文必须给出与常识不同的因果。只是复述常识的，重写正文。",
+    "4. 结尾：不能是反问句，必须落到可迁移的类比 / 边界条件 / 代价 / 反例之一。",
+    "5. 正文 3-5 句，不注水，不写成百科条目。",
+    "6. 元信息泄漏：正文或 source 里出现「需核对」「待核实」「据估计」「具体以原文为准」「（需补充…）」这类草稿痕迹，必须删掉那个说法，改写成能站得住的完整表述，或者整句删除。",
+    "",
+    "输出要求：",
+    "- 严格 JSON 数组，" + slim.length + " 个对象，顺序与输入完全一致。",
+    "- 每个对象含 title / body / domain / source 四个字段，字段都要给全。",
+    "- 合格的原样返回，不合格的返回改写后的完整内容。",
+    "- 不要任何解释文字，不要 markdown 代码块。",
+    "",
+    "待审查：",
+    JSON.stringify(slim, null, 1),
+  ].join("\n");
+}
+
+async function reviewCards(cards){
+  const raw = await chat([
+    { role:"system", content:"你是内容审查员，只输出合法 JSON，不输出任何其他内容。" },
+    { role:"user", content: buildReviewPrompt(cards) },
+  ], { maxTokens: 5200, temperature: 0.3, thinking: false });
+  const arr = extractJSON(raw);
+  if(!Array.isArray(arr) || arr.length !== cards.length) return null;
+  return arr;
+}
+
+/* 把审查结果写回卡片对象和 DOM */
+function applyReview(cards, reviewed){
+  let changed = 0;
+  reviewed.forEach((r, i) => {
+    const c = cards[i];
+    if(!c || !r) return;
+    const t = String(r.title || "").trim();
+    if(!t) return;
+    if(t !== c.title || String(r.body || "") !== c.body) changed++;
+    c.title = t;
+    if(r.body) c.body = String(r.body).trim();
+    if(r.domain) c.domain = String(r.domain).trim();
+    if(r.source !== undefined) c.source = String(r.source || "").trim();
+  });
+
+  // 抽卡牌堆
+  [...document.querySelectorAll("#deck .slide")].forEach((el, i) => {
+    const c = cards[i];
+    if(!c) return;
+    const set = (sel, txt) => { const n = el.querySelector(sel); if(n && txt !== undefined) n.textContent = txt; };
+    set(".face.front .title", c.title);
+    set(".face.front .domain", c.domain + " · " + (i + 1) + "/" + cards.length);
+    set(".face.back .body", c.body);
+    set(".face.back .domain", c.domain);
+    set(".face.back .src", c.source);
+  });
+  // 缩略条
+  [...document.querySelectorAll("#strip .thumb")].forEach((el, i) => {
+    const c = cards[i];
+    if(!c) return;
+    const d = el.querySelector(".td"), t = el.querySelector(".tt");
+    if(d) d.textContent = c.domain;
+    if(t) t.textContent = c.title;
+  });
+  // 泡泡
+  [...document.querySelectorAll("#bubbleStage .orbit")].forEach((el, i) => {
+    const c = cards[i];
+    if(!c) return;
+    const set = (sel, txt) => { const n = el.querySelector(sel); if(n && txt !== undefined) n.textContent = txt; };
+    set(".ball", c.domain);
+    set(".c2d", c.domain);
+    set("h3", c.title);
+    set("p", c.body);
+    set(".c2s", c.source);
+  });
+
+  S.cards.forEach(c => {
+    const hit = cards.find(x => x.id === c.id);
+    if(hit){ c.title = hit.title; c.body = hit.body; c.domain = hit.domain; c.source = hit.source; }
+  });
+  saveCards();
+  return changed;
+}
+
+/* ============ 单卡审查（手动触发） ============ */
+function buildSingleReviewPrompt(c){
+  return [
+    "审查下面这张灵感卡。",
+    "",
+    "标题：" + c.title,
+    "正文：" + c.body,
+    "领域：" + c.domain,
+    "来源：" + (c.source || "（空）"),
+    "",
+    "审查标准：",
+    "1. 标题：答案是不是废话？动词和比喻（「转晕」「甩」「赶回家」）在正文里能不能找到对应的真实动作？夸张修辞算不合格。",
+    "2. 数字：每个百分比、年份、金额、时长是否有可核验的主体（机构 / 法规编号 / 论文名）？没有主体的具体数字要标出来。",
+    "3. 反直觉：正文给出的因果是否真的与常识不同？只是复述常识的要点出来。",
+    "4. 结尾：是否落到可迁移的类比 / 边界条件 / 代价 / 反例？是不是反问句？",
+    "5. 专业细节：术语、方法名、角度、时长、适用分型是否与文献一致？凭印象写的一律指出。",
+    "6. 草稿痕迹：正文或来源里如果有「需核对」「待核实」「据估计」「具体以原文为准」「（需补充论文名）」这类元信息，算不合格——这是半成品，不是卡片。改写时必须彻底删掉。",
+    "",
+    "只输出 JSON，不要任何其他文字：",
+    '{',
+    '  "verdict": "合格" 或 "有问题（N 个）",',
+    '  "issues": ["哪一句、什么问题、为什么", "…"],',
+    '  "rewrite": { "title": "…", "body": "…", "domain": "…", "source": "…" } 或 null',
+    '}',
+    "有问题时 rewrite 必须给完整改写版（四字段齐全）；没问题时 rewrite 为 null。",
+  ].join("\n");
+}
+
+let rvTarget = null, rvRewrite = null, rvSnapshot = null, rvApplied = false;
+
+function renderReviewResult(obj){
+  const out = $("#rvOut");
+  if(!out) return;
+  const issues = Array.isArray(obj.issues) ? obj.issues.filter(Boolean) : [];
+  let html = '<h4>结论</h4><p>' + esc(obj.verdict || "—") + '</p>';
+  html += '<h4>问题</h4>';
+  html += issues.length
+    ? '<ul>' + issues.map(x => '<li>' + esc(String(x)) + '</li>').join('') + '</ul>'
+    : '<p>未发现。</p>';
+  const rw = obj.rewrite;
+  html += '<h4>改写</h4>';
+  if(rw && rw.title){
+    html += '<p><strong>' + esc(rw.title) + '</strong></p>';
+    if(rw.body) html += '<p>' + esc(rw.body) + '</p>';
+    const meta = [rw.domain, rw.source].filter(Boolean).join(" · ");
+    if(meta) html += '<p style="color:var(--fg3);font-size:11px">' + esc(meta) + '</p>';
+  }else{
+    html += '<p>无需改写。</p>';
+  }
+  out.innerHTML = html;
+}
+
+/* 把改写写回卡片对象 + 所有出现它的 DOM */
+function updateCardInDOM(c){
+  const slides = [...document.querySelectorAll("#deck .slide")];
+  const total = slides.length;
+
+  document.querySelectorAll('[data-review="' + c.id + '"]').forEach(btn => {
+    const slide = btn.closest(".slide");
+    if(slide){
+      const si = slides.indexOf(slide);
+      const f = slide.querySelector(".face.front");
+      if(f){
+        const t = f.querySelector(".title"); if(t) t.textContent = c.title;
+        const d = f.querySelector(".domain");
+        if(d) d.textContent = c.domain + " · " + (si + 1) + "/" + total;
+      }
+      const b = slide.querySelector(".face.back");
+      if(b){
+        const d = b.querySelector(".domain"); if(d) d.textContent = c.domain;
+        const body = b.querySelector(".body"); if(body) body.textContent = c.body;
+        const src = b.querySelector(".src"); if(src) src.textContent = c.source;
+      }
+    }
+    const orbit = btn.closest(".orbit");
+    if(orbit){
+      const set = (sel, txt) => { const n = orbit.querySelector(sel); if(n) n.textContent = txt; };
+      set(".ball", c.domain); set(".c2d", c.domain);
+      set("h3", c.title); set("p", c.body); set(".c2s", c.source);
+    }
+  });
+
+  // 底部缩略条
+  const idx = slides.findIndex(s => s.querySelector('[data-review="' + c.id + '"]'));
+  if(idx >= 0){
+    const th = document.querySelectorAll("#strip .thumb")[idx];
+    if(th){
+      const d = th.querySelector(".td"); if(d) d.textContent = c.domain;
+      const t = th.querySelector(".tt"); if(t) t.textContent = c.title;
+    }
+  }
+}
+
+function applyRewriteToCard(c, rw){
+  if(!c || !rw || !rw.title) return;
+  c.title = String(rw.title).trim();
+  if(rw.body) c.body = String(rw.body).trim();
+  if(rw.domain) c.domain = String(rw.domain).trim();
+  if(rw.source !== undefined) c.source = String(rw.source || "").trim();
+  c.reviewed = true;
+
+  const hit = S.cards.find(x => x.id === c.id);
+  if(hit && hit !== c){
+    hit.title = c.title; hit.body = c.body; hit.domain = c.domain; hit.source = c.source;
+  }
+  saveCards();
+  updateCardInDOM(c);
+  toast("已应用改写");
+}
+
+function restoreCard(c, snap){
+  if(!c || !snap) return;
+  c.title = snap.title; c.body = snap.body; c.domain = snap.domain; c.source = snap.source;
+  const hit = S.cards.find(x => x.id === c.id);
+  if(hit && hit !== c){ hit.title = snap.title; hit.body = snap.body; hit.domain = snap.domain; hit.source = snap.source; }
+  saveCards();
+  updateCardInDOM(c);
+  toast("已撤销改写");
+}
+
+/* 发一次审查请求，返回 {verdict, issues, rewrite} */
+async function requestReview(c){
+  if(!S.cfg.base || !S.cfg.model) throw new Error("还没配置模型，去设置里填一下");
+  const raw = await chat([
+    { role:"system", content:"你是严格的内容审查员，只输出合法 JSON。" },
+    { role:"user", content: buildSingleReviewPrompt(c) },
+  ], { maxTokens: 1800, temperature: 0.3, thinking: false });
+  const obj = extractObject(raw);
+  if(!obj || !obj.verdict) throw new Error("返回格式不对，没法解析审查结果");
+  return obj;
+}
+
+async function reviewOneCard(c, autoApply){
+  if(!c) return;
+
+  /* 一键改写：不弹窗，直接改 */
+  if(autoApply){
+    rvTarget = c;
+    rvSnapshot = { title: c.title, body: c.body, domain: c.domain, source: c.source };
+    toast("审查改写中…");
+    try{
+      const obj = await requestReview(c);
+      const rw = (obj.rewrite && obj.rewrite.title) ? obj.rewrite : null;
+      if(rw){
+        applyRewriteToCard(c, rw);
+        toast("已审查改写");
+      }else{
+        toast("审查通过，没有改动");
+      }
+    }catch(e){
+      toast("审查失败：" + (e.message || String(e)).slice(0, 40));
+    }
+    return;
+  }
+
+  /* 弹窗模式：先看结果，再决定 */
+  const mask = $("#reviewMask"), out = $("#rvOut");
+  if(!mask || !out) return;
+
+  rvTarget = c;
+  rvRewrite = null;
+  rvApplied = false;
+  rvSnapshot = { title: c.title, body: c.body, domain: c.domain, source: c.source };
+  const applyBtn = $("#btnRvApply");
+  if(applyBtn){
+    applyBtn.style.display = "none";
+    applyBtn.textContent = "应用改写";
+    applyBtn.disabled = false;
+  }
+
+  $("#rvCard").innerHTML =
+    '<b>' + esc(c.title) + '</b>' +
+    '<p>' + esc(c.body) + '</p>' +
+    '<div class="rvMeta">' + esc(c.domain) + (c.source ? " · " + esc(c.source) : "") + '</div>';
+  out.innerHTML = '<div class="loading"><i></i><i></i><i></i></div>';
+  mask.classList.add("on");
+
+  try{
+    const obj = await requestReview(c);
+    rvRewrite = (obj.rewrite && obj.rewrite.title) ? obj.rewrite : null;
+    renderReviewResult(obj);
+    if(rvRewrite && applyBtn) applyBtn.style.display = "";
+  }catch(e){
+    out.innerHTML = '<div class="rvErr">' + esc(e.message || String(e)) + '</div>';
+  }
+}
+
+function buildDrawPrompt(theme){
+  const ratio = Number(S.cfg.ratio);
+  const hasTheme = !!theme;
+  const related = Math.max(0, Math.min(10, ratio));
+  const unrelated = 10 - related;
+  const recent = recentTitles(60);
+
+  const rules = [
+    "你是一个「灵感引擎」，不是老师、不是励志博主、不是知识付费讲师。你产出的东西必须让人读完脑子里冒出一个新联想。",
+    "",
+    "输出 10 张灵感卡（一条火花 = 一个能引发联想的输入，不是需要背诵的知识点）。每张卡是一个 JSON 对象，字段：",
+    '  "title": 8-15 个汉字。必须是一个「答案会让人意外」的问句或断言。',
+    '    写标题前先在心里回答一遍。如果答案是「这不是废话吗」（例如「越堵越慢」「熬夜会困」「糖吃多了会胖」），立刻换一条重写。',
+    '    合格的只有三种：① 常识本身是错的 ② 答案与直觉相反 ③ 现象天天见，但机制几乎没人知道。',
+    '    反例（全部不合格）：「城市越堵，救护车反而越慢吗」——答案是「堵所以慢」，零信息；「为什么睡不够会累」——同理。', 
+    '  "body": 3-5 句，必须回答标题提出的问题。按这个顺序写：① 机制或成因 ② 一个具体证据（数字、事件、专名）③ 反直觉的结论 ④ 落地的做法、边界条件或代价。不许注水，不许写成百科条目',
+    '  "domain": 所属领域，2-4 个汉字（如 生物学 / 经济学 / 材料学）',
+    '  "source": 大致来源或可深挖的方向，不超过 20 字（如 「海洋生物学 · 头足类研究」）',
+    "",
+    "硬性要求：",
+    "1) 每条的核心必须是一个「反直觉的因果」或「被普遍误解的事实」，而不是陈述性常识。",
+    "2) 读完应该是「啊，原来是这样」——惊讶来自答案本身，不是来自新的困惑。做不到就换一条。",
+    "3) 禁止：励志、鸡汤、人生道理、「研究表明」式空话、模糊的常识、纯数字罗列。",
+    "3b) 禁止把常识包装成问句。标题的答案不能是标题字面意思，必须提供标题没暗示的信息。",
+    "3c) 数字必须可核验：引用任何百分比、时长、金额、年份、数量时，必须同时给出可检索的主体（机构名 / 法规编号 / 论文或报告名）。",
+    "3d) 不要把「我不确定」写进成品。title / body / source 里一律不许出现「需核对」「待核实」「不确定」「据估计」「具体以原文为准」「以实验设定为准」「此处不写死」「（需补充论文名）」这类元信息或草稿痕迹。",
+    "    想不起出处的，直接删掉那句话，或者换成纯机制描述；实在撑不住的整条换掉。读者要成品，不要看你的工作笔记。",
+    "    想不出具体出处的，宁可不写数字，改用机制和因果描述。严禁「某国一项研究发现 40%」「有数据显示约三成」这类没有主体的伪证据。",
+    "4) 每条标题和内容都必须独立可读，不依赖上下文。标题可以尖锐，但必须语法通顺、语义明确——不能为了张力写得含混（比如「越烧越只剩火」这种读不懂的比喻）。",
+    "",
+    "结尾规则（重要）：结尾要留一个「可以继续想」的方向，但必须建立在已经给出的答案之上——" +
+    "一个可迁移的类比、一个边界条件、一个代价、或一个反例。" +
+    "禁止用反问句收尾，禁止写「那……呢？」「那到底是什么？」这类把问题抛回给读者的句子。" +
+    "读者读完应该觉得「原来如此，而且还能往这想」，而不是「所以到底是怎么回事？」。",
+    "",
+    "输出总量控制：10 条加起来不超过 2200 个汉字。宁可每条写短一点，也必须保证 JSON 完整闭合、最后一条不被截断。",
+    "",
+    "自检（逐条过）：",
+    "  a. 标题：把答案填进去，读起来像不像一句废话？像就换标题。",
+    "  b. 兑现：读者读完 body，能不能回答 title 里的那个问题？答不上来就重写这条。",
+    "  c. 证据：body 里每个数字，我能不能说出它是谁、哪一年、什么报告给的？说不出就删掉那个数字。", 
+  ];
+
+  if(hasTheme){
+    const mode = MODE_ORDER.includes(S.cfg.mode) ? S.cfg.mode : "C";
+    rules.push(
+      "",
+      `主题：「${theme}」。`,
+      `5) 10 条中，${related} 条按下面第 6 条的要求围绕「${theme}」，另外 ${unrelated} 条必须完全无视主题、纯做意外。`,
+      modeRule(theme, related, mode),
+      modeExtraRule(theme, related, mode),
+      "8) 无关的那几条，质量不能下降，它们的作用是撞出意外联想。"
+    );
+  }else{
+    rules.push(
+      "",
+      "5) 10 条必须来自 10 个互不相干的领域，不允许重复领域。",
+      "6) 领域跨度要大：尽量覆盖自然科学、社会科学、工程、历史、艺术、医学、语言学、地理等不同大类。"
+    );
+  }
+
+  if(recent.length){
+    rules.push(
+      "",
+      "以下标题已经抽过，禁止重复，也不要换汤不换药（同一条换个说法）：",
+      recent.slice(-45).map(t => "- " + t).join("\n")
+    );
+  }
+
+  rules.push(
+    "",
+    '严格只输出 JSON 数组，不要任何解释文字、不要 markdown 代码块标记。格式：[{"title":"…","body":"…","domain":"…","source":"…"}, …]'
+  );
+
+  return rules.join("\n");
+}
+
+function buildCollidePrompt(a, b){
+  return [
+    "你在做一个「跨界碰撞」练习，目的是帮人产生新点子。",
+    "",
+    "概念 A：" + a.title + "（" + a.domain + "）",
+    "  背景：" + a.body,
+    "",
+    "概念 B：" + b.title + "（" + b.domain + "）",
+    "  背景：" + b.body,
+    "",
+    "请写出 3 段，每段 2-3 句，中文，不要客套：",
+    "1) 机制同构：这两个东西在底层机制上有什么相似的结构？用具体的对应关系说，不要泛泛而谈「都需要平衡」。",
+    "2) 反向借用：如果把 A 的机制搬到 B 的领域，会得到一个什么具体的、可执行的想法？",
+    "3) 一个真问题：这个碰撞暴露出什么值得继续想、但目前没人回答的问题？",
+    "",
+    "要求：具体、可验证、有信息量。不要写「这启发我们」这类空话。",
+    "格式：用 markdown。每段一个 ### 小标题，关键对应关系用 **加粗**，机制名用 `反引号`，两件事的对应写成 A ↔ B。",
+  ].join("\n");
+}
+
+/* ============ 抽卡 ============ */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.3l2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9z"/></svg>';
+
+function normalizeCard(raw, theme, demo){
+  if(!raw || typeof raw !== "object") return null;
+  const title = String(raw.title || "").trim();
+  if(!title) return null;
+  return {
+    id: uid(),
+    title,
+    body: String(raw.body || "").trim(),
+    domain: String(raw.domain || "").trim() || "杂项",
+    source: String(raw.source || "").trim(),
+    theme: theme || "",
+    ts: Date.now(),
+    saved: false,
+    demo: !!demo,
+  };
+}
+
+/* 从累积文本里捞出所有完整的 {...}，流式解析用 */
+function harvestObjects(buf){
+  const out = [];
+  let depth = 0, inStr = false, esc = false, start = -1;
+  for(let i = 0; i < buf.length; i++){
+    const ch = buf[i];
+    if(esc){ esc = false; continue; }
+    if(ch === "\\"){ esc = true; continue; }
+    if(ch === '"'){ inStr = !inStr; continue; }
+    if(inStr) continue;
+    if(ch === "{"){ if(depth === 0) start = i; depth++; }
+    else if(ch === "}"){ depth--; if(depth === 0 && start >= 0){ out.push(buf.slice(start, i + 1)); start = -1; } }
+  }
+  return out;
+}
+
+/* 流式请求：凑齐一张卡就回调一次 */
+async function streamPack(theme, onCard, onProgress){
+  const { base, model, key } = S.cfg;
+  if(!base || !model) throw new Error("NO_API");
+
+  const thinking = !!S.cfg.thinking;
+  const body = {
+    model,
+    messages: [
+      { role:"system", content:"你只输出合法的 JSON，不输出任何其他内容。" },
+      { role:"user", content: buildDrawPrompt(theme) },
+    ],
+    temperature: 0.98,
+    max_tokens: thinking ? 8000 : 5200,
+    stream: true,
+  };
+  const isDeepSeek = /deepseek/i.test(base + " " + model);
+  if(isDeepSeek){
+    body.thinking = { type: thinking ? "enabled" : "disabled" };
+    if(thinking) body.reasoning_effort = "high";
+  }else if(thinking){
+    body.reasoning_effort = "high";
+  }
+
+  const res = await fetch(endpointOf(base), {
+    method: "POST",
+    headers: Object.assign(
+      { "Content-Type": "application/json" },
+      key ? { "Authorization": "Bearer " + key } : {}
+    ),
+    body: JSON.stringify(body),
+  });
+
+  if(!res.ok){
+    const txt = await res.text().catch(()=> "");
+    let detail = txt.slice(0, 200);
+    try{ const j = JSON.parse(txt); detail = j?.error?.message || detail; }catch(e){}
+    throw new Error("API " + res.status + "：" + detail);
+  }
+  if(!res.body) throw new Error("这个接口不支持流式返回");
+
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let sse = "", buf = "", handled = 0, finished = false, lastFinish = "", thinkChars = 0;
+
+  const pump = () => {
+    const objs = harvestObjects(buf);
+    while(handled < objs.length){
+      const raw = objs[handled++];
+      try{ onCard(JSON.parse(raw)); }catch(e){}
+    }
+  };
+
+  while(!finished){
+    const step = await reader.read();
+    if(step.done) break;
+    sse += dec.decode(step.value, { stream: true });
+    const lines = sse.split("\n");
+    sse = lines.pop() || "";
+    for(const line of lines){
+      const t = line.trim();
+      if(!t.startsWith("data:")) continue;
+      const payload = t.slice(5).trim();
+      if(payload === "[DONE]"){ finished = true; break; }
+      try{
+        const j = JSON.parse(payload);
+        const ch = (j.choices && j.choices[0]) || null;
+        if(ch && ch.finish_reason) lastFinish = ch.finish_reason;
+        const d = (ch && ch.delta) || {};
+        /* 思考模式：各家字段名不同，内容不显示，只用来告诉用户「还在想」 */
+        const think = d.reasoning_content || d.reasoning || d.thinking || "";
+        if(think) thinkChars += think.length;
+        const delta = d.content || "";
+        if(delta){ buf += delta; pump(); }
+        if(onProgress && (think || delta)) onProgress(thinkChars, buf.length, handled);
+      }catch(e){ /* 半截 JSON，丢掉 */ }
+    }
+  }
+  // 收到 [DONE] 就提前 break 了，把 reader 收掉，别让连接悬着
+  if(finished){ try{ await reader.cancel(); }catch(e){} }
+  pump();
+  if(handled > 0) markModelVerified();
+  return { handled, finish: lastFinish };
+}
+
+/* ===== 逐张发牌 ===== */
+let deckReady = false;
+
+/* 把当前这一包落盘：刷新后还能接着看 */
+const PACK_KEY = "kg_pack_v1";
+
+function savePack(){
+  if(!S.current || !S.current.length) return;
+  try{
+    localStorage.setItem(PACK_KEY, JSON.stringify({
+      ids: S.current.map(c => c.id),
+      idx: S.slide || 0,
+      ts: Date.now(),
+    }));
+  }catch(e){ /* 满了就算了 */ }
+}
+
+function restorePack(){
+  let p = null;
+  try{ p = JSON.parse(localStorage.getItem(PACK_KEY) || "null"); }catch(e){}
+  if(!p || !Array.isArray(p.ids) || !p.ids.length) return false;
+
+  const map = new Map(S.cards.map(c => [c.id, c]));
+  const items = p.ids.map(id => map.get(id)).filter(Boolean);
+  if(!items.length) return false;
+
+  S.current = items;
+  deckReady = false;
+  const hero = $("#hero");
+  if(hero) hero.style.display = "none";
+  $("#drawArea").innerHTML = "";
+  beginDeck();
+  items.forEach(c => appendSlide(c, false));
+  endDeck(items, items.every(c => c.demo), items[0].theme || "", null);
+  setSlide(p.idx || 0);
+
+  const note = $("#deckNote");
+  if(note){
+    const i = Math.min((p.idx || 0) + 1, items.length);
+    note.textContent = "接着看 · 上次停在第 " + i + " 张";
+    note.style.color = "var(--fg2)";
+  }
+  return true;
+}
+
+function beginDeck(){
+  deckReady = true;
+  $("#drawArea").innerHTML = "";
+
+  const head = document.createElement("div");
+  head.id = "deckHead";
+  head.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 12px";
+  head.innerHTML =
+    '<div class="deckMeta">' +
+      '<span class="themeTag" id="deckTheme"></span>' +
+      '<span class="timeTag" id="deckTime"></span>' +
+      '<span id="deckNote" style="font-size:12.5px;color:var(--fg2)">正在发牌…</span>' +
+    '</div>' +
+    '<button class="miniBtn" id="btnAgain">再抽一包</button>';
+  $("#drawArea").appendChild(head);
+
+  const wrap = document.createElement("div");
+  wrap.className = "deckWrap";
+  wrap.id = "deckWrap";
+  wrap.innerHTML =
+    '<button class="navBtn prev" id="btnPrev" aria-label="上一个">' +
+      '<svg viewBox="0 0 24 24"><path d="M15 4l-7 8 7 8"/></svg></button>' +
+    '<div class="deck" id="deck"><div class="deckHint">正在连接…</div></div>' +
+    '<button class="navBtn next" id="btnNext" aria-label="下一个">' +
+      '<svg viewBox="0 0 24 24"><path d="M9 4l7 8-7 8"/></svg></button>';
+  $("#drawArea").appendChild(wrap);
+
+  const strip = document.createElement("div");
+  strip.className = "strip";
+  strip.id = "strip";
+  $("#drawArea").appendChild(strip);
+
+  $("#btnAgain").onclick = () => { $("#drawArea").innerHTML = ""; $("#hero").style.display = ""; draw(); };
+  wrap.querySelector("#btnPrev").onclick = () => setSlide(S.slide - 1);
+  wrap.querySelector("#btnNext").onclick = () => setSlide(S.slide + 1);
+}
+
+function appendSlide(c, animate = true){
+  const deck = $("#deck"), strip = $("#strip");
+  if(!deck) return;
+  const i = deck.querySelectorAll(".slide").length;
+  const hint = deck.querySelector(".deckHint");
+  if(hint) hint.remove();
+
+  const el = document.createElement("div");
+  el.className = "slide" + (animate ? " dealing" : "");
+  el.dataset.i = i;
+  el.innerHTML =
+    '<div class="inner">' +
+      '<div class="face front">' +
+        '<div class="domain" data-domain="' + esc(c.domain) + '">' + esc(c.domain) + '</div>' +
+        '<div class="title">' + esc(c.title) + '</div>' +
+        '<div class="cardFoot"><button class="saveBtn' + (c.saved ? " on" : "") + '" data-save="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
+          '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
+          '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
+      '</div>' +
+      '<div class="face back">' +
+        '<div class="domain">' + esc(c.domain) + '</div>' +
+        '<div class="body">' + esc(c.body) + '</div>' +
+        '<div class="src">' + esc(c.source) + '</div>' +
+        '<div class="cardFoot"><button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
+          '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
+      '</div>' +
+    '</div>' +
+    (c.demo ? '<span class="demoTag">示例</span>' : '');
+
+  let downAt = null, justSelected = false;
+  el.addEventListener("mousedown", ev => { downAt = { x:ev.clientX, y:ev.clientY }; justSelected = false; });
+  el.addEventListener("mouseup", () => {
+    const sel = window.getSelection();
+    justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
+  });
+  el.addEventListener("click", ev => {
+    if(ev.target.closest("[data-save]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+    const sel = window.getSelection();
+    const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
+    const dragged = downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8;
+    if(hasSel || justSelected || dragged){ justSelected = false; return; }
+    if(Number(el.dataset.i) === S.slide) el.classList.toggle("flipped");
+    else setSlide(Number(el.dataset.i));
+  });
+  const sb = el.querySelector("[data-save]");
+  if(sb) sb.addEventListener("click", ev => { ev.stopPropagation(); toggleSave(sb.dataset.save, sb); });
+  el.querySelectorAll("[data-review], [data-review-auto]").forEach(rv => {
+    rv.addEventListener("click", ev => {
+      ev.stopPropagation();
+      reviewOneCard(c, !!rv.dataset.reviewAuto);
+    });
+  });
+
+  deck.appendChild(el);
+  if(animate) setTimeout(() => el.classList.remove("dealing"), 480);
+
+  if(strip){
+    const t = document.createElement("button");
+    t.className = "thumb";
+    t.dataset.i = i;
+    t.innerHTML = '<span class="td">' + esc(c.domain) + '</span><span class="tt">' + esc(c.title) + '</span>';
+    t.onclick = () => setSlide(i);
+    strip.appendChild(t);
+  }
+
+  setSlide(S.slide);
+}
+
+function fmtPackTime(ts){
+  if(!ts) return "";
+  const d = new Date(ts), now = new Date();
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  if(d.toDateString() === now.toDateString()) return hm;
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if(d.toDateString() === y.toDateString()) return "昨天 " + hm;
+  return (d.getMonth() + 1) + "/" + d.getDate() + " " + hm;
+}
+
+function endDeck(cards, usedDemo, theme, error, finish){
+  const deck = $("#deck");
+  if(!deck) return;
+  const n = deck.querySelectorAll(".slide").length;
+
+  [...deck.querySelectorAll(".slide .face.front .domain")].forEach((dom, i) => {
+    const base = dom.dataset.domain || dom.textContent;
+    dom.textContent = base + " · " + (i + 1) + "/" + n;
+  });
+
+  const timeEl = $("#deckTime");
+  if(timeEl){
+    const ts = (cards && cards[0] && cards[0].ts) || Date.now();
+    timeEl.textContent = fmtPackTime(ts);
+    timeEl.title = "抽这一包的时间：" + new Date(ts).toLocaleString("zh-CN");
+  }
+
+  const tag = $("#deckTheme");
+  if(tag){
+    if(theme){ tag.textContent = theme; tag.classList.add("on"); }
+    else { tag.textContent = ""; tag.classList.remove("on"); }
+  }
+
+  const note = $("#deckNote");
+  if(note){
+    let txt;
+    if(error) txt = "这一包不是 AI 生成的";
+    else if(usedDemo) txt = "演示数据";
+    else if(n < 10){
+      const why = finish === "length"
+        ? (S.cfg.thinking ? "被 max_tokens 截断，思考模式吃掉了大半额度，建议关掉" : "被 max_tokens 截断")
+        : finish === "stop" ? "模型自己写完了 " + n + " 条"
+        : "流被中断";
+      txt = "只拿到 " + n + " 条 · " + why;
+    }
+    else txt = "新的一包";
+    note.textContent = txt;
+    note.style.color = (error || n < 10) ? "var(--warn)" : "var(--fg2)";
+  }
+
+  if(error){
+    const bar = document.createElement("div");
+    bar.className = "errBar";
+    bar.innerHTML = '<div class="errMsg"><b>AI 调用失败</b><span>' + esc(error.message || String(error)) + '</span></div>' +
+                    '<button class="miniBtn" id="btnRetry">重试</button>';
+    const wrap = $("#deckWrap");
+    if(wrap && wrap.parentNode) wrap.parentNode.insertBefore(bar, wrap);
+    const r = bar.querySelector("#btnRetry");
+    if(r) r.onclick = () => { $("#drawArea").innerHTML = ""; $("#hero").style.display = ""; draw(); };
+  }
+
+  setSlide(0);
+}
+
+function toggleSave(id, btnEl){
+  const c = S.cards.find(x => x.id === id);
+  if(!c) return;
+  c.saved = !c.saved;
+  if(c.saved) c.ts = Date.now();
+  saveCards();
+  document.querySelectorAll('[data-save="' + id + '"]').forEach(el => el.classList.toggle("on", c.saved));
+  document.querySelectorAll('[data-save2="' + id + '"]').forEach(el => el.classList.toggle("on", c.saved));
+  if(btnEl) btnEl.classList.toggle("on", c.saved);
+  if(typeof renderFav === "function") renderFav();
+  updateCounts();
+  toast(c.saved ? "已收藏" : "已取消收藏");
+}
+
+function commitPack(items){
+  S.current = items;
+  const ids = new Set(S.cards.map(c => c.id));
+  S.cards.push(...items.filter(c => !ids.has(c.id)));
+  saveCards();
+  savePack();
+  updateCounts();
+}
+
+/* 一次拿完（泡泡自动换包用） */
+async function fetchPack(theme){
+  let items = null, usedDemo = false, error = null;
+
+  if(S.cfg.base && S.cfg.model){
+    try{
+      const raw = await chat([
+        { role:"system", content:"你只输出合法的 JSON，不输出任何其他内容。" },
+        { role:"user", content: buildDrawPrompt(theme) },
+      ], { maxTokens: 5200, temperature: 0.98 });
+      items = extractJSON(raw);
+    }catch(err){
+      error = err;
+      items = null;
+    }
+  }
+
+  if(!Array.isArray(items) || !items.length){
+    items = DEMO_CARDS.slice();
+    usedDemo = true;
+  }
+
+  items = items.map(it => normalizeCard(it, theme, usedDemo)).filter(Boolean).slice(0, 10);
+
+  if(usedDemo){
+    S.cards = S.cards.filter(c => !c.demo || c.saved);
+    const seen = new Map(S.cards.map(c => [c.title, c]));
+    items = items.map(c => seen.get(c.title) || c);
+  }
+
+  return { items, usedDemo, error };
+}
+
+async function draw(){
+  if(S.busy) return;
+  S.busy = true;
+  deckReady = false;
+
+  const btn = $("#btnDraw");
+  btn.disabled = true;
+  $("#hero").style.display = "none";
+  $("#drawArea").innerHTML = '<div class="loading"><i></i><i></i><i></i></div>';
+
+  const theme = $("#theme").value.trim();
+  saveThemeInput(theme);
+  rememberTheme(theme);
+  const cards = [];
+  const drawTs = Date.now();          // 整包用同一个时间戳
+  let error = null, usedDemo = false, finish = "";
+
+  const add = c => {
+    if(!c) return;
+    if(cards.some(x => x.title === c.title)) return;
+    c.ts = drawTs;
+    cards.push(c);
+    if(!deckReady) beginDeck();
+    appendSlide(c);
+  };
+
+  /* 流式进度：思考阶段也要让用户看到在动 */
+  const onProgress = (thinkChars, contentChars, n) => {
+    const hint = $("#deck .deckHint");
+    if(!hint || n > 0) return;
+    hint.textContent = thinkChars > 0
+      ? "思考中 · 已 " + thinkChars + " 字"
+      : (contentChars > 0 ? "生成中…" : "正在连接…");
+  };
+
+  // 1) 流式：来一张发一张
+  if(S.cfg.base && S.cfg.model){
+    beginDeck();                       // 先摆好牌桌，思考阶段也有地方显示进度
+    try{
+      const r = await streamPack(theme, raw => add(normalizeCard(raw, theme, false)), onProgress);
+      finish = r && r.finish || "";
+    }catch(e){
+      error = e;
+    }
+  }
+
+  // 2) 流式没拿到东西，退回一次性请求（仍然逐张发出）
+  if(!cards.length && S.cfg.base && S.cfg.model){
+    const hint = $("#deck .deckHint");
+    if(hint) hint.textContent = "这个接口不支持流式，改用一次性请求…";
+    try{
+      const raw = await chat([
+        { role:"system", content:"你只输出合法的 JSON，不输出任何其他内容。" },
+        { role:"user", content: buildDrawPrompt(theme) },
+      ], { maxTokens: 5200, temperature: 0.98 });
+      const list = extractJSON(raw).map(x => normalizeCard(x, theme, false)).filter(Boolean);
+      for(const c of list){ add(c); await sleep(90); }
+      if(cards.length) error = null;   // 退路走通了就不算失败
+    }catch(e){
+      error = error || e;
+    }
+  }
+
+  // 3) 还是没有，用演示数据
+  if(!cards.length){
+    usedDemo = true;
+    const seen = new Map(S.cards.filter(c => c.demo && c.saved).map(c => [c.title, c]));
+    const pool = DEMO_CARDS.map(x => seen.get(x.title) || normalizeCard(x, theme, true)).filter(Boolean);
+    for(const c of pool){ add(c); await sleep(80); }
+  }
+
+  if(!deckReady){
+    beginDeck();
+    cards.forEach(appendSlide);
+  }
+
+  /* ---- 审查环节：生成完再让模型自查改写 ---- */
+  let reviewedCount = 0;
+  const canReview = S.cfg.review !== false && !usedDemo && !error
+                    && cards.length && S.cfg.base && S.cfg.model;
+  if(canReview){
+    const note = $("#deckNote");
+    const wrap = $("#deckWrap");
+    if(note) note.textContent = "审查中 · 逐条核对标题、数字出处和结尾";
+    if(wrap) wrap.classList.add("reviewing");
+    try{
+      const fixed = await reviewCards(cards);
+      if(fixed) reviewedCount = applyReview(cards, fixed) || 0;
+    }catch(e){
+      console.warn("review failed", e);
+    }
+    if(wrap) wrap.classList.remove("reviewing");
+    if(note) note.textContent = "";
+  }
+
+  endDeck(cards, usedDemo, theme, error, finish);
+  if(reviewedCount > 0){
+    const note = $("#deckNote");
+    if(note) note.textContent += " · 已审查改写 " + reviewedCount + " 条";
+  }
+  commitPack(cards);
+
+  S.busy = false;
+  btn.disabled = false;
+}
+
+/* ===== 层叠轮播：当前居中、左右各露一张 ===== */
+function setSlide(i){
+  const deck = $("#deck");
+  if(!deck) return;
+  const slides = [...deck.querySelectorAll(".slide")];
+  const n = slides.length;
+  if(!n) return;
+
+  S.slide = ((i % n) + n) % n;
+
+  slides.forEach((el, k) => {
+    el.classList.remove("on", "prev", "next", "hide");
+    if(k === S.slide) el.classList.add("on");
+    else if(k === (S.slide - 1 + n) % n) el.classList.add("prev");
+    else if(k === (S.slide + 1) % n) el.classList.add("next");
+    else el.classList.add("hide");
+    if(k !== S.slide) el.classList.remove("flipped");
+  });
+
+  const strip = $("#strip");
+  if(strip){
+    [...strip.querySelectorAll(".thumb")].forEach((t, k) => t.classList.toggle("on", k === S.slide));
+    savePack();
+    const th = strip.querySelector(".thumb.on");
+    if(th){
+      const target = th.offsetLeft - strip.clientWidth / 2 + th.offsetWidth / 2;
+      strip.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+    }
+  }
+}
+
+/* ============ 泡泡视图 ============ */
+let bubbleItems = [], bubbleIdx = 0, bubblePaused = false, bubbleBusy = false, bubbleCollapsed = false;
+let bubbleRotateTimer = null, bubbleRefreshTimer = null, bubbleTickTimer = null;
+let bubblePackDeadline = 0;
+
+const BUBBLE_KEY = "kg_bubble_v1";
+
+function saveBubbleState(){
+  if(!bubbleItems.length) return;
+  try{
+    localStorage.setItem(BUBBLE_KEY, JSON.stringify({
+      ids: bubbleItems.map(c => c.id),
+      idx: bubbleIdx,
+      ts: Date.now(),
+    }));
+  }catch(e){}
+}
+
+function restoreBubbleState(){
+  let p = null;
+  try{ p = JSON.parse(localStorage.getItem(BUBBLE_KEY) || "null"); }catch(e){}
+  if(!p || !Array.isArray(p.ids) || !p.ids.length) return null;
+  const map = new Map(S.cards.map(c => [c.id, c]));
+  const items = p.ids.map(id => map.get(id)).filter(Boolean);
+  if(!items.length) return null;
+  return { items, idx: Math.max(0, Math.min(Number(p.idx) || 0, items.length - 1)) };
+}
+
+function beginBubbles(showHint = true){
+  bubbleItems = [];
+  bubbleIdx = 0;
+  const stage = $("#bubbleStage");
+  stage.innerHTML = showHint ? '<div class="empty">正在生成…</div>' : "";
+  stage.classList.remove("has-focus");
+  startDrift();
+}
+
+function appendBubble(c){
+  const stage = $("#bubbleStage");
+  const hint = stage.querySelector(".empty");
+  if(hint) hint.remove();
+
+  const i = bubbleItems.length;
+  bubbleItems.push(c);
+
+  // 固定 10 个槽位：新泡泡占据新位置，已有的不会被推来推去
+  const slot = i % 10;
+  const ang = (slot / 10) * Math.PI * 2 - Math.PI / 2;
+  const left = (50 + Math.cos(ang) * 33 + (Math.random() - .5) * 6).toFixed(1);
+  const top  = (50 + Math.sin(ang) * 33 + (Math.random() - .5) * 6).toFixed(1);
+
+  const orbit = document.createElement("div");
+  orbit.className = "orbit fresh";
+  orbit.dataset.i = i;
+  orbit.dataset.left = left + "%";
+  orbit.dataset.top = top + "%";
+  orbit.style.left = left + "%";
+  orbit.style.top = top + "%";
+  orbit.dataset.phase = (Math.random() * Math.PI * 2).toFixed(3);
+  orbit.dataset.amp = (9 + Math.random() * 8).toFixed(1);
+
+  orbit.innerHTML =
+    '<div class="drift"><div class="bubble">' +
+      '<div class="ball">' + esc(c.domain) + '</div>' +
+      '<div class="card2">' +
+        '<button class="closeBtn" data-close="1" title="收起，回到小泡泡" aria-label="收起"></button>' +
+        '<div class="c2d">' + esc(c.domain) + '</div>' +
+        '<h3>' + esc(c.title) + '</h3>' +
+        '<p>' + esc(c.body) + '</p>' +
+        (c.source ? '<div class="c2s">' + esc(c.source) + '</div>' : '') +
+      '</div>' +
+      '<div class="cardFoot"><button class="save2' + (c.saved ? " on" : "") + '" data-save2="' + c.id + '" title="收藏">' + STAR_SVG + '</button>' +
+      '<button class="reviewBtn" data-review="' + c.id + '" title="用模型审查这张卡">审查</button>' +
+      '<button class="reviewBtn auto" data-review-auto="' + c.id + '" title="审查后直接应用改写">改写</button></div>' +
+    '</div></div>';
+
+  /* 和抽卡卡一样：选中文字 / 拖拽选词时不触发切卡，
+     点在已展开的那张上也不重播动画 */
+  let downAt = null, justSelected = false;
+  orbit.addEventListener("mousedown", ev => {
+    downAt = { x:ev.clientX, y:ev.clientY };
+    justSelected = false;
+  });
+  orbit.addEventListener("mouseup", () => {
+    const sel = window.getSelection();
+    justSelected = !!(sel && !sel.isCollapsed && String(sel).trim());
+  });
+  orbit.addEventListener("click", ev => {
+    if(ev.target.closest("[data-save2]") || ev.target.closest("[data-close]") || ev.target.closest("[data-review]") || ev.target.closest("[data-review-auto]")) return;
+
+    const sel = window.getSelection();
+    const hasSel = !!(sel && !sel.isCollapsed && String(sel).trim());
+    const dragged = downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 8;
+    if(hasSel || justSelected || dragged){ justSelected = false; return; }
+
+    if(i === bubbleIdx && !bubbleCollapsed) return;   // 已经是这张，别重播
+    focusBubble(i, true);
+  });
+  orbit.querySelector("[data-close]").addEventListener("click", ev => {
+    ev.stopPropagation();
+    unfocusBubble();
+  });
+  const sb = orbit.querySelector("[data-save2]");
+  sb.addEventListener("click", ev => {
+    ev.stopPropagation();
+    toggleSave(c.id, sb);
+  });
+  orbit.querySelectorAll("[data-review], [data-review-auto]").forEach(rv => {
+    rv.addEventListener("click", ev => {
+      ev.stopPropagation();
+      reviewOneCard(c, !!rv.dataset.reviewAuto);
+    });
+  });
+
+  stage.appendChild(orbit);
+  requestAnimationFrame(() => orbit.classList.remove("fresh"));
+
+  if(i === 0) focusBubble(0, false);
+}
+
+function endBubbles(){
+  const stage = $("#bubbleStage");
+  if(!bubbleItems.length){
+    stage.innerHTML = '<div class="empty">这一包没抽出来。<br>再点一次「换一包」。</div>';
+    bubbleIdx = 0;
+    return;
+  }
+  stage.classList.toggle("paused", bubblePaused);
+  if(!stage.classList.contains("has-focus")) focusBubble(0, false);
+  resetRotateTimer();
+  startRefreshTimer();
+  updateBubbleInfo();
+  saveBubbleState();
+}
+
+function renderBubbles(items){
+  beginBubbles(false);
+  items.slice(0, 10).forEach(appendBubble);
+  endBubbles();
+}
+
+/* 泡泡漂移：rAF 驱动。切到焦点时把 translate 平滑归零，
+   避免 CSS 动画被移除那一帧的瞬跳（之前抖动的根因）。 */
+let driftRaf = null, driftT0 = 0;
+
+function driftTick(now){
+  const stage = document.getElementById("bubbleStage");
+  if(!stage || S.view !== "bubble"){ driftRaf = null; return; }
+  const t = (now - driftT0) / 1000;
+
+  stage.querySelectorAll(".orbit").forEach(o => {
+    const d = o.querySelector(".drift");
+    if(!d) return;
+
+    const ph = Number(o.dataset.phase || 0);
+    const baseAmp = Number(o.dataset.amp || 12);
+    const isFocus = o.classList.contains("focus");
+
+    // 幅度做指数逼近，而不是靠 transition / 动画切换。
+    // 这样焦点卡片是「漂移逐渐收拢到中心」，失去焦点是「从中心慢慢荡开」，
+    // 任何一帧都不会出现瞬跳。
+    const target = isFocus ? 0 : baseAmp;
+    let cur = Number(o.dataset.ampCur);
+    if(!isFinite(cur)) cur = isFocus ? 0 : baseAmp;
+    cur = cur + (target - cur) * 0.13;
+    o.dataset.ampCur = cur.toFixed(3);
+
+    const dx = Math.sin(t * 0.55 + ph) * cur;
+    const dy = Math.cos(t * 0.42 + ph * 1.7) * cur * 0.75;
+    d.style.translate = dx.toFixed(2) + "px " + dy.toFixed(2) + "px";
+  });
+
+  driftRaf = requestAnimationFrame(driftTick);
+}
+
+function startDrift(){
+  if(driftRaf) return;
+  driftT0 = performance.now();
+  driftRaf = requestAnimationFrame(driftTick);
+}
+function stopDrift(){
+  if(driftRaf) cancelAnimationFrame(driftRaf);
+  driftRaf = null;
+}
+
+/* 把一段文本按实际渲染行拆成 span，逐行浮现 */
+function splitLines(el, baseDelay, step){
+  if(!el) return 0;
+  const full = el.textContent;
+  if(!full.trim()) return 0;
+  if(el.querySelector(".ln")) el.textContent = full;   // 重拆前先合回纯文本
+  const tn = el.firstChild;
+  if(!tn || tn.nodeType !== 3) return 0;
+  const text = full;
+
+  const range = document.createRange();
+  const rows = [];
+  let cur = null;
+  for(let i = 0; i < text.length; i++){
+    if(text[i] === "\n") continue;
+    range.setStart(tn, i);
+    range.setEnd(tn, i + 1);
+    const rects = range.getClientRects();
+    if(!rects.length) continue;
+    const top = Math.round(rects[0].top);
+    if(!cur || Math.abs(cur.top - top) > 2){
+      cur = { top, start:i, end:i + 1 };
+      rows.push(cur);
+    }else{
+      cur.end = i + 1;
+    }
+  }
+  if(!rows.length) return 0;
+
+  const frag = document.createDocumentFragment();
+  rows.forEach((r, k) => {
+    const chunk = text.slice(r.start, r.end);
+    if(!chunk.trim()) return;                 // 纯空白行不占动画
+    const sp = document.createElement("span");
+    sp.className = "ln";
+    sp.style.setProperty("--d", (baseDelay + k * step) + "ms");
+    sp.textContent = chunk;
+    frag.appendChild(sp);
+  });
+  el.textContent = "";
+  el.appendChild(frag);
+  return rows.length;
+}
+
+/* 每次变成大卡时重放：先确保行已拆好（此时卡片可见，才量得到行） */
+let cardAnimTimer = null;
+
+function targetCardWidth(){
+  const w = window.innerWidth;
+  return Math.min(w * (w <= 520 ? 0.90 : 0.86), 520);
+}
+
+function splitCard(card2){
+  // 标题不拆：它是整块出现的，拆分反而会让它逐字/逐行冒出来
+  const h3 = card2.querySelector("h3");
+  if(h3 && h3.querySelector(".ln")) h3.textContent = h3.textContent;
+
+  const ps = card2.querySelectorAll("p");
+  let base = 90;
+  ps.forEach(pEl => {
+    const rows = splitLines(pEl, base, 46);
+    base += rows * 46 + 60;
+  });
+
+  const src = card2.querySelector(".c2s");
+  if(src) src.style.setProperty("--d", base + "ms");
+}
+
+function playCardAnim(card2){
+  if(!card2) return;
+  clearTimeout(cardAnimTimer);
+  card2.classList.remove("ready");
+  card2.classList.add("anim");           // 立刻藏住内容，展开途中不露全文
+
+  /* 泡泡的 width 有过渡，必须等它真的到目标值再量行，
+     否则会按中间宽度把字拆成一字一行 */
+  const run = (tries, lastW) => {
+    const w = card2.getBoundingClientRect().width;
+    const atTarget = w >= targetCardWidth() - 6;
+    const stable = lastW !== undefined && Math.abs(w - lastW) < 0.5;
+    if((!atTarget || !stable) && tries < 60){
+      cardAnimTimer = setTimeout(() => run(tries + 1, w), 40);
+      return;
+    }
+    splitCard(card2);
+    card2.classList.remove("ready");
+    void card2.offsetWidth;
+    card2.classList.add("ready");
+  };
+  cardAnimTimer = setTimeout(() => run(0), 100);
+}
+
+function focusBubble(i, manual){
+  const stage = $("#bubbleStage");
+  const orbits = [...stage.querySelectorAll(".orbit")];
+  if(!orbits.length) return;
+
+  bubbleIdx = ((i % orbits.length) + orbits.length) % orbits.length;
+
+  orbits.forEach((o, k) => {
+    if(k === bubbleIdx){
+      o.classList.add("focus");
+      o.style.left = "50%";
+      o.style.top  = "50%";
+    }else{
+      o.classList.remove("focus");
+      o.style.left = o.dataset.left;
+      o.style.top  = o.dataset.top;
+    }
+  });
+
+  stage.classList.add("has-focus");
+  if(bubbleCollapsed){ bubbleCollapsed = false; updateBubbleInfo(); }
+  playCardAnim(orbits[bubbleIdx].querySelector(".card2"));
+  saveBubbleState();
+  restartProgress();
+  if(manual) resetRotateTimer();
+}
+
+/* 收起大泡泡，回到全部小泡泡自由飘动的状态 */
+function unfocusBubble(){
+  const stage = $("#bubbleStage");
+  if(!stage.classList.contains("has-focus")) return;
+
+  stage.classList.remove("has-focus");
+  stage.querySelectorAll(".orbit").forEach(o => {
+    o.classList.remove("focus");
+    o.style.left = o.dataset.left;
+    o.style.top = o.dataset.top;
+  });
+
+  bubbleCollapsed = true;
+  saveBubbleState();
+  clearTimeout(bubbleRotateTimer);
+  bubbleRotateTimer = null;
+  ringPause();
+  updateBubbleInfo();
+}
+
+let bubbleDeadline = 0;    // 下一次轮播的绝对时间戳
+let bubbleRemainMs = 0;    // 暂停时冻结下来的剩余毫秒
+
+function rotateMs(){
+  return Math.max(5, Number(S.cfg.rotateSec) || 60) * 1000;
+}
+
+/* 倒计时下划线：由短变长，rAF 驱动，和轮播计时共用同一套时钟 */
+const ringState = { el:null, fill:null, start:0, dur:0, paused:false, remain:0 };
+let ringRaf = null;
+
+function ringFrame(){
+  if(!ringState.paused){
+    const t = performance.now() - ringState.start;
+    const p = Math.min(1, t / ringState.dur);
+    if(ringState.el) ringState.el.style.setProperty("--left", p.toFixed(4));   // 由短变长
+    if(ringState.fill) ringState.fill.style.width = (p * 100).toFixed(2) + "%";
+    if(p >= 1){ ringRaf = null; return; }
+  }
+  ringRaf = requestAnimationFrame(ringFrame);
+}
+
+function ringStart(durMs){
+  cancelAnimationFrame(ringRaf);
+  ringState.el = null;                    // 卡片上的下划线已经去掉，进度只在「下一个」按钮里
+  ringState.fill = document.getElementById("nextFill");
+  ringState.dur = Math.max(1000, durMs);
+  ringState.start = performance.now();
+  ringState.paused = false;
+  ringState.remain = 0;
+  if(ringState.fill) ringState.fill.style.width = "0%";
+  ringRaf = requestAnimationFrame(ringFrame);
+}
+
+function ringPause(){
+  if(ringState.paused) return;
+  ringState.remain = Math.max(0, ringState.dur - (performance.now() - ringState.start));
+  ringState.paused = true;
+  cancelAnimationFrame(ringRaf);
+  ringRaf = null;
+}
+
+function ringResume(){
+  if(!ringState.paused) return;
+  ringState.start = performance.now() - (ringState.dur - ringState.remain);
+  ringState.paused = false;
+  ringRaf = requestAnimationFrame(ringFrame);
+}
+
+/* 从头开始 */
+function restartProgress(){
+  ringStart(rotateMs());
+}
+
+function scheduleRotate(ms){
+  clearTimeout(bubbleRotateTimer);
+  bubbleRotateTimer = null;
+  if(S.view !== "bubble" || bubblePaused || bubbleCollapsed) return;
+
+  bubbleDeadline = Date.now() + ms;
+  bubbleRotateTimer = setTimeout(() => {
+    bubbleRotateTimer = null;
+    if(S.view !== "bubble" || bubblePaused || bubbleCollapsed) return;
+    focusBubble(bubbleIdx + 1, false);   // 内部会重播进度条
+    scheduleRotate(rotateMs());
+  }, ms);
+}
+
+/* 从头计时（进入视图、切卡、改配置） */
+function resetRotateTimer(){
+  bubbleRemainMs = 0;
+  if(S.view !== "bubble" || bubblePaused || bubbleCollapsed){
+    clearTimeout(bubbleRotateTimer);
+    bubbleRotateTimer = null;
+    return;
+  }
+  restartProgress();
+  scheduleRotate(rotateMs());
+}
+
+/* 只冻结，记住还剩多久 —— 恢复时接着走，不重置 */
+function pauseRotate(){
+  if(bubbleRotateTimer) bubbleRemainMs = Math.max(300, bubbleDeadline - Date.now());
+  clearTimeout(bubbleRotateTimer);
+  bubbleRotateTimer = null;
+  ringPause();
+  syncPauseBtnState();
+}
+
+/* 从冻结处继续 */
+function resumeRotate(){
+  if(S.view !== "bubble" || bubblePaused || bubbleCollapsed) return;
+  const ms = bubbleRemainMs > 300 ? bubbleRemainMs : rotateMs();
+  if(!(bubbleRemainMs > 300)) restartProgress();  // 没有剩余时间才重播
+  bubbleRemainMs = 0;
+  scheduleRotate(ms);
+  ringResume();
+  syncPauseBtnState();
+}
+
+function startRefreshTimer(){
+  clearInterval(bubbleRefreshTimer);
+  bubbleRefreshTimer = null;
+  clearInterval(bubbleTickTimer);
+  bubbleTickTimer = null;
+
+  const min = Number(S.cfg.refreshMin);
+  if(!(min > 0)){
+    bubblePackDeadline = 0;
+    updateBubbleInfo();
+    return;
+  }
+
+  bubblePackDeadline = Date.now() + min * 60000;
+
+  bubbleRefreshTimer = setInterval(() => {
+    if(S.view === "bubble") bubbleRefresh(false);
+    bubblePackDeadline = Date.now() + min * 60000;
+  }, min * 60 * 1000);
+
+  // 每秒刷新剩余时间
+  bubbleTickTimer = setInterval(updateBubbleInfo, 1000);
+  updateBubbleInfo();
+}
+
+function syncPauseBtnState(){
+  const btn = $("#btnBubblePause");
+  if(!btn) return;
+  const frozen = (bubblePaused || ringState.paused) && !bubbleCollapsed;
+  btn.classList.toggle("on", frozen);
+}
+
+function updateNextBtnTitle(){
+  const btn = $("#btnBubbleNext");
+  if(!btn) return;
+  const badge = $("#nextBadge");
+  if(!badge) return;
+
+  if(bubbleCollapsed || !bubbleDeadline){
+    badge.classList.add("off");
+    btn.title = "下一个";
+    return;
+  }
+  badge.classList.remove("off");
+
+  /* 悬停 / 手动暂停时用冻结下来的剩余时间，别让秒数继续往下走 */
+  const frozen = ringState.paused || bubblePaused;
+  const left = frozen ? ringState.remain : Math.max(0, bubbleDeadline - Date.now());
+
+  const sec = Math.max(0, Math.ceil(left / 1000));
+  badge.textContent = sec > 99 ? "99" : String(sec);
+  const mm = Math.floor(left / 60000);
+  const ss = Math.floor((left % 60000) / 1000);
+  btn.title = "还剩 " + mm + ":" + String(ss).padStart(2, "0") + " 后自动切下一个";
+}
+
+function updatePackBtn(){
+  const btn = $("#btnBubbleNew"), fill = $("#packFill");
+  if(!btn || !fill) return;
+  const min = Number(S.cfg.refreshMin) || 0;
+  if(!(min > 0) || !bubblePackDeadline){
+    fill.style.width = "0%";
+    btn.title = "换一包";
+    return;
+  }
+  const total = min * 60000;
+  const left = Math.max(0, bubblePackDeadline - Date.now());
+  const pct = Math.min(100, Math.max(0, (1 - left / total) * 100));
+  fill.style.width = pct.toFixed(2) + "%";
+  const mm = Math.floor(left / 60000);
+  const ss = Math.floor((left % 60000) / 1000);
+  btn.title = "还剩 " + mm + ":" + String(ss).padStart(2, "0") + " 后自动换一包";
+}
+
+function fmtSec(s){
+  return (s >= 60 && s % 60 === 0) ? (s / 60) + " 分钟" : s + " 秒";
+}
+
+function bubbleTheme(){
+  const c = bubbleItems[bubbleIdx] || bubbleItems[0];
+  return (c && c.theme) ? c.theme : "";
+}
+
+function updateBubbleTip(){
+  const r = $("#tipRotate"), pk = $("#tipPack");
+  if(r) r.textContent = "每 " + fmtSec(Number(S.cfg.rotateSec) || 60) + "换一个";
+  const min = Number(S.cfg.refreshMin) || 0;
+  if(pk) pk.textContent = min > 0 ? min + " 分钟换一包" : "自动换包已关";
+}
+
+function updateBubbleInfo(){
+  const min = Number(S.cfg.refreshMin) || 0;
+  const btn = $("#btnBubblePause");
+  const PICO_PAUSE = '<svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1"/></svg>';
+  const PICO_PLAY  = '<svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a1 1 0 0 0 1.53.85l10.3-6.8a1 1 0 0 0 0-1.7L9.53 4.35A1 1 0 0 0 8 5.2z"/></svg>';
+  const setPauseIcon = () => {
+    btn.innerHTML = bubblePaused ? PICO_PLAY : PICO_PAUSE;
+    btn.title = bubblePaused ? "继续" : "暂停";
+    btn.setAttribute("aria-label", btn.title);
+  };
+
+  // 主题单独成一个小标签
+  const chip = $("#bubbleTheme");
+  const tm = bubbleTheme();
+  if(chip){
+    if(tm){ chip.textContent = tm; chip.classList.add("on"); }
+    else { chip.textContent = ""; chip.classList.remove("on"); }
+  }
+  updateBubbleTip();
+
+  if(bubbleCollapsed){
+    let p2 = "";
+    if(min > 0 && bubblePackDeadline){
+      const l = Math.max(0, bubblePackDeadline - Date.now());
+      p2 = " · " + Math.floor(l/60000) + ":" + String(Math.floor((l%60000)/1000)).padStart(2,"0") + " 后换一包";
+    }
+    $("#bubbleInfo").textContent = "已收起 · 点任意泡泡展开" + p2;
+    setPauseIcon();
+    updatePackBtn();
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+  $("#bubbleInfo").textContent = "";      // 节奏说明收进问号里了
+
+  setPauseIcon();
+  syncPauseBtnState();
+  updatePackBtn();
+  updateNextBtnTitle();
+}
+
+async function bubbleRefresh(manual){
+  if(bubbleBusy) return;
+  bubbleBusy = true;
+  const btn = $("#btnBubbleNew");
+  const labelEl = btn.querySelector(".packTxt");
+  btn.disabled = true;
+  if(labelEl) labelEl.textContent = "抽取中…";
+
+  const theme = $("#theme").value.trim();
+  saveThemeInput(theme);
+  rememberTheme(theme);
+  const got = [];
+  let error = null, usedDemo = false;
+
+  const add = c => {
+    if(!c || got.some(x => x.title === c.title)) return;
+    got.push(c);
+    appendBubble(c);              // 来一个放一个
+  };
+
+  try{
+    beginBubbles();
+
+    if(S.cfg.base && S.cfg.model){
+      try{
+        await streamPack(theme, raw => add(normalizeCard(raw, theme, false)));
+      }catch(e){ error = e; }
+    }
+
+    // 流式没拿到 → 一次性请求，仍然逐个放
+    if(!got.length && S.cfg.base && S.cfg.model){
+      try{
+        const raw = await chat([
+          { role:"system", content:"你只输出合法的 JSON，不输出任何其他内容。" },
+          { role:"user", content: buildDrawPrompt(theme) },
+        ], { maxTokens: 5200, temperature: 0.98 });
+        const list = extractJSON(raw).map(x => normalizeCard(x, theme, false)).filter(Boolean);
+        for(const c of list){ add(c); await sleep(70); }
+        if(got.length) error = null;
+      }catch(e){ error = error || e; }
+    }
+
+    // 还是不行 → 演示数据，也逐个放
+    if(!got.length){
+      usedDemo = true;
+      const seen = new Map(S.cards.filter(c => c.demo && c.saved).map(c => [c.title, c]));
+      const pool = DEMO_CARDS.map(x => seen.get(x.title) || normalizeCard(x, theme, true)).filter(Boolean);
+      for(const c of pool){ add(c); await sleep(60); }
+    }
+  } finally {
+    endBubbles();
+    bubbleBusy = false;
+    btn.disabled = false;
+    if(labelEl) labelEl.textContent = "换一包";
+  }
+
+  if(got.length){
+    commitPack(got);
+    if(manual) toast(usedDemo ? "演示数据 · " + got.length + " 个泡泡" : "来了 " + got.length + " 个泡泡");
+  }else if(manual){
+    toast("这一包没抽出来");
+  }
+  if(error && manual) toast(error.message || "生成失败，用了演示数据");
+}
+
+function enterBubble(){
+  const saved = restoreBubbleState();
+  const items = saved ? saved.items : ((S.current && S.current.length) ? S.current : S.cards.slice(-10));
+  if(items.length){
+    renderBubbles(items);
+    if(saved && saved.idx > 0) focusBubble(saved.idx, false);
+  }else{
+    $("#bubbleStage").innerHTML = '<div class="empty">还没有灵感。<br>点下面的「换一包」抽第一包。</div>';
+  }
+  $("#bubbleStage").classList.toggle("paused", bubblePaused);
+  startDrift();
+  resetRotateTimer();
+  startRefreshTimer();
+  updateBubbleInfo();
+}
+
+function exitBubble(){
+  clearTimeout(bubbleRotateTimer); bubbleRotateTimer = null;
+  clearInterval(bubbleRefreshTimer); bubbleRefreshTimer = null;
+  clearInterval(bubbleTickTimer); bubbleTickTimer = null;
+  cancelAnimationFrame(ringRaf); ringRaf = null;
+  stopDrift();
+}
+
+/* ============ 视图切换 ============ */
+function setView(v){
+  const prev = S.view;
+  S.view = v;
+  if(["draw", "bubble", "hist", "fav"].includes(v)){
+    try{ localStorage.setItem("kg_view_v1", v); }catch(e){}
+  }
+  $$(".view").forEach(el => el.classList.toggle("on", el.id === "view-" + v));
+  $$(".tab").forEach(el => el.classList.toggle("on", el.dataset.view === v));
+  $("#btnFavNav").classList.toggle("active", v === "fav");
+  $("#btnHistNav").classList.toggle("active", v === "hist");
+  if(v === "fav") renderFav();
+  if(v === "hist") renderHist();
+  if(v === "collide"){ renderPair(); renderCollideHistory(); }
+  if(v === "bubble" && prev !== "bubble") enterBubble();
+  if(prev === "bubble" && v !== "bubble") exitBubble();
+  if(v === "draw" && S.current.length) $("#hero").style.display = "none";
+  else if(v === "draw" && !S.current.length) $("#hero").style.display = "";
+  if(v !== "bubble") window.scrollTo(0,0);
+}
+
+function updateCounts(){
+  const fav = S.cards.filter(c => c.saved).length;
+  const fb = $("#favBadge"), hb = $("#histBadge");
+  if(fb) fb.textContent = fav ? String(fav) : "";
+  if(hb) hb.textContent = S.cards.length ? String(S.cards.length) : "";
+  if($("#favSub"))  $("#favSub").textContent  = fav + " 张";
+  if($("#histSub")) $("#histSub").textContent = S.cards.length + " 张";
+}
+
+/* ============ 完整备份 / 恢复 ============ */
+function exportBackup(){
+  const payload = {
+    app: "inspiration-gacha",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    cards: S.cards,
+    collides: S.collides,
+    cfg: {
+      ratio: S.cfg.ratio,
+      mode: S.cfg.mode,
+      rotateSec: S.cfg.rotateSec,
+      refreshMin: S.cfg.refreshMin,
+    },
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "灵感引擎-备份-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  toast("已备份 " + S.cards.length + " 张卡 · " + S.collides.length + " 条碰撞");
+}
+
+function updateDataStat(){
+  const el = $("#dataStat");
+  if(!el) return;
+  const fav = S.cards.filter(c => c.saved).length;
+  el.innerHTML =
+    "本地存着 <b style=\"color:var(--fg2)\">" + S.cards.length + "</b> 张卡（收藏 " + fav + "）· " +
+    "<b style=\"color:var(--fg2)\">" + S.collides.length + "</b> 条碰撞记录<br>" +
+    "数据在浏览器 localStorage 里，<span style=\"color:var(--warn)\">改目录名、换浏览器、清缓存都会丢</span>，重要内容记得备份。";
+}
+
+/* 合并导入：不覆盖已有内容，按 id 去重 */
+function applyBackup(data){
+  const cards = Array.isArray(data) ? data : (data && data.cards);
+  if(!Array.isArray(cards)) throw new Error("文件里没有 cards 数组，可能不是这个应用的备份");
+
+  const have = new Set(S.cards.map(c => c.id).filter(Boolean));
+  let added = 0;
+  for(const c of cards){
+    if(!c || !c.title) continue;
+    const id = c.id || uid();
+    if(have.has(id)) continue;
+    S.cards.push({ ...c, id });
+    have.add(id);
+    added++;
+  }
+
+  const haveColl = new Set(S.collides.map(c => c.id).filter(Boolean));
+  let cadd = 0;
+  for(const x of ((data && data.collides) || [])){
+    if(!x || !x.id || haveColl.has(x.id)) continue;
+    S.collides.push(x);
+    haveColl.add(x.id);
+    cadd++;
+  }
+
+  saveCards();
+  try{ localStorage.setItem(LS_COLLIDES, JSON.stringify(S.collides)); }catch(e){}
+
+  updateCounts();
+  updateDataStat();
+  renderFav();
+  renderHist();
+  renderCollideHistory();
+  return { added, cadd };
+}
+
+let wipeArmed = false, wipeTimer = null;
+function resetWipe(){
+  wipeArmed = false;
+  clearTimeout(wipeTimer);
+  const b = $("#btnWipe");
+  if(b){ b.textContent = "清空所有数据"; b.classList.remove("armed"); }
+}
+function wipeAll(){
+  S.cards = [];
+  S.collides = [];
+  try{ localStorage.removeItem(LS_CARDS); }catch(e){}
+  try{ localStorage.removeItem(LS_COLLIDES); }catch(e){}
+  S.current = [];
+  S.pair = [null, null];
+  updateCounts();
+  updateDataStat();
+  renderFav();
+  renderHist();
+  renderCollideHistory();
+  renderPair();
+  $("#drawArea").innerHTML = "";
+  $("#hero").style.display = "";
+  toast("已清空全部数据");
+}
+
+function importBackupFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(String(reader.result));
+      const r = applyBackup(data);
+      toast("导入完成：新增 " + r.added + " 张卡、" + r.cadd + " 条碰撞");
+    }catch(err){
+      toast("导入失败：" + (err.message || "文件无法解析"));
+    }
+  };
+  reader.onerror = () => toast("读取文件失败");
+  reader.readAsText(file);
+}
+
+/* ============ 收藏 ============ */
+function renderFav(){
+  const list = S.cards.filter(c => c.saved).slice().reverse();
+  const box = $("#favList");
+  if(!list.length){
+    box.innerHTML = '<div class="empty">还没有收藏。<br>抽卡时点标题左边的星标存进来。</div>';
+    updateDataStat();
+    return;
+  }
+  box.innerHTML = list.map(c => `
+    <div class="listCard">
+      <div class="meta">
+        <p class="t">${esc(c.title)}</p>
+        <p class="d">${esc(c.body)}</p>
+        <div class="tags"><em>${esc(c.domain)}</em><span>${esc(c.source)}</span></div>
+      </div>
+      <button class="miniBtn on" data-unsave="${c.id}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.3l2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9z"/></svg></button>
+    </div>
+  `).join("");
+  box.querySelectorAll("[data-unsave]").forEach(b => {
+    b.onclick = () => { toggleSave(b.dataset.unsave, null); };
+  });
+  updateDataStat();
+}
+
+/* ============ 历史 ============ */
+/* ============ 主题历史 ============ */
+const THEMES_KEY = "kg_themes_v1";
+let histTheme = (() => {
+  try{ return localStorage.getItem("kg_hist_theme_v1") || ""; }catch(e){ return ""; }
+})();
+
+function setHistTheme(t){
+  histTheme = t || "";
+  try{ localStorage.setItem("kg_hist_theme_v1", histTheme); }catch(e){}
+  renderHist();
+}
+
+function loadThemes(){
+  try{ return JSON.parse(localStorage.getItem(THEMES_KEY) || "[]"); }catch(e){ return []; }
+}
+
+function saveThemeInput(v){
+  try{ localStorage.setItem("kg_theme_input_v1", String(v || "").trim()); }catch(e){}
+}
+
+function rememberTheme(t){
+  t = String(t || "").trim();
+  if(!t) return;
+  unhideTheme(t);
+  const list = loadThemes().filter(x => x && x.t !== t);
+  list.unshift({ t, ts: Date.now() });
+  try{ localStorage.setItem(THEMES_KEY, JSON.stringify(list.slice(0, 30))); }catch(e){}
+}
+
+function themeCounts(){
+  const m = new Map();
+  S.cards.forEach(c => { if(c.theme) m.set(c.theme, (m.get(c.theme) || 0) + 1); });
+  return m;
+}
+
+function hiddenThemes(){
+  try{ return JSON.parse(localStorage.getItem("kg_themes_hidden_v1") || "[]"); }catch(e){ return []; }
+}
+
+function hideTheme(t){
+  const h = hiddenThemes();
+  if(!h.includes(t)){ h.push(t); }
+  try{ localStorage.setItem("kg_themes_hidden_v1", JSON.stringify(h)); }catch(e){}
+}
+
+function unhideTheme(t){
+  const h = hiddenThemes().filter(x => x !== t);
+  try{ localStorage.setItem("kg_themes_hidden_v1", JSON.stringify(h)); }catch(e){}
+}
+
+function themeList(){
+  const m = new Map();
+  loadThemes().forEach(x => { if(x && x.t && !m.has(x.t)) m.set(x.t, x.ts || 0); });
+  S.cards.forEach(c => { if(c.theme && !m.has(c.theme)) m.set(c.theme, 0); });
+  const hidden = new Set(hiddenThemes());
+  return [...m.entries()].filter(e => !hidden.has(e[0])).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+}
+
+function renderThemeMenu(){
+  const menu = $("#themeMenu");
+  if(!menu) return;
+  const themes = themeList();
+  if(!themes.length){ menu.innerHTML = ""; menu.classList.remove("on"); return; }
+  const counts = themeCounts();
+  menu.innerHTML = themes.map(t => {
+    const n = counts.get(t) || 0;
+    return '<button data-theme="' + esc(t) + '"><span>' + esc(t) + '</span><span class="cnt">' + (n ? n + " 条" : "—") + '</span></button>';
+  }).join("");
+  menu.querySelectorAll("[data-theme]").forEach(b => {
+    b.onclick = ev => {
+      ev.stopPropagation();
+      const inp = $("#theme");
+      inp.value = b.dataset.theme;
+      saveThemeInput(inp.value);
+      menu.classList.remove("on");
+    };
+  });
+}
+
+function renderHistFilter(){
+  const tabs = $("#histTabs");
+  if(!tabs) return;
+  const counts = themeCounts();
+  const themes = themeList();
+  if(histTheme && !themes.includes(histTheme)){                  // 记录没了就别卡着
+    histTheme = "";
+    try{ localStorage.setItem("kg_hist_theme_v1", ""); }catch(e){}
+  }
+  const items = [{ t:"", label:"全部", n:S.cards.length }]
+    .concat(themes.map(t => ({ t, label:t, n:counts.get(t) || 0 })));
+
+  tabs.innerHTML = items.map(it =>
+    '<span class="histTab' + (histTheme === it.t ? " on" : "") + '" data-t="' + esc(it.t) + '">' +
+      '<b>' + esc(it.label) + '</b><em>' + it.n + '</em>' +
+      (it.t ? '<i class="tabX" data-del="' + esc(it.t) + '" title="从列表移除">×</i>' : '') +
+    '</span>').join("");
+
+  tabs.querySelectorAll(".histTab").forEach(el => {
+    el.onclick = ev => {
+      if(ev.target.closest("[data-del]")) return;
+      setHistTheme(el.dataset.t);
+    };
+  });
+  tabs.querySelectorAll("[data-del]").forEach(x => {
+    x.onclick = ev => {
+      ev.stopPropagation();
+      const t = x.dataset.del;
+      hideTheme(t);
+      if(histTheme === t) setHistTheme("");
+      else renderHist();
+      toast("已从主题列表移除：" + t);
+    };
+  });
+
+  requestAnimationFrame(layoutHistTabs);
+}
+
+/* 放不下的 tab 收进右侧「⋯」列表 */
+function layoutHistTabs(){
+  const tabs = $("#histTabs"), more = $("#histMore"), menu = $("#histMoreMenu");
+  if(!tabs || !more || !menu) return;
+
+  const items = [...tabs.querySelectorAll(".histTab")];
+  items.forEach(el => { el.style.display = ""; });
+
+  const limit = tabs.clientWidth;
+  items.forEach(el => {
+    if(el.offsetLeft + el.offsetWidth > limit + 1) el.style.display = "none";
+  });
+
+  // 选中的那个必须看得见：腾一个位置给它（不动「全部」）
+  const active = tabs.querySelector(".histTab.on");
+  if(active && active.style.display === "none"){
+    active.style.display = "";
+    const spare = items.filter(el =>
+      el.style.display !== "none" && el !== active && el.dataset.t !== "");
+    const victim = spare[spare.length - 1];
+    if(victim) victim.style.display = "none";
+  }
+
+  const over = items.filter(el => el.style.display === "none");
+
+  if(!over.length){
+    more.style.display = "none";
+    menu.classList.remove("on");
+    return;
+  }
+  more.style.display = "";
+  menu.innerHTML = over.map(el =>
+    '<button data-t="' + esc(el.dataset.t) + '"><span>' + esc(el.querySelector("b").textContent) +
+    '</span><em>' + esc(el.querySelector("em").textContent) + '</em></button>').join("");
+  menu.querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      menu.classList.remove("on");
+      setHistTheme(b.dataset.t);
+    };
+  });
+}
+
+function renderHist(){
+  renderHistFilter();
+  const q = ($("#search").value || "").trim().toLowerCase();
+  let list = S.cards.slice().reverse();
+  if(histTheme) list = list.filter(c => c.theme === histTheme);
+  if(q) list = list.filter(c =>
+    (c.title + c.body + c.domain + c.source).toLowerCase().includes(q));
+
+  const sub = $("#histSub");
+  if(sub) sub.textContent = (histTheme ? histTheme + " · " : "") + list.length + " 条";
+
+  const box = $("#histList");
+  if(!list.length){
+    box.innerHTML = '<div class="empty">' + (q ? "没有匹配的记录。" : (histTheme ? "这个主题下还没有记录。" : "还没抽过卡。")) + '</div>';
+    return;
+  }
+  box.innerHTML = list.slice(0, 300).map(c => {
+    const d = new Date(c.ts);
+    const ds = (d.getMonth()+1) + "/" + d.getDate();
+    return `
+    <div class="listCard">
+      <div class="meta">
+        <p class="t">${esc(c.title)}</p>
+        <p class="d">${esc(c.body)}</p>
+        <div class="tags"><em>${esc(c.domain)}</em><span>${ds}</span>${c.theme ? '<span class="tTag" data-theme="' + esc(c.theme) + '">· ' + esc(c.theme) + '</span>' : ''}${c.demo ? '<span style="color:var(--warn)">示例</span>' : ''}</div>
+      </div>
+      <button class="miniBtn ${c.saved?'on':''}" data-unsave="${c.id}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.3l2.6 5.5 6 .9-4.3 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.3-4.2 6-.9z"/></svg></button>
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-unsave]").forEach(b => {
+    b.onclick = () => { toggleSave(b.dataset.unsave, b); };
+  });
+  box.querySelectorAll(".tTag").forEach(t => {
+    t.onclick = () => setHistTheme(t.dataset.theme);
+  });
+}
+
+/* ============ 碰撞 ============ */
+function renderPair(){
+  const [a, b] = S.pair;
+  const fill = (el, card, empty, idx) => {
+    if(!card){
+      el.className = "slot";
+      el.innerHTML = empty;
+    }else{
+      el.className = "slot filled";
+      el.innerHTML = '<div class="sl-d">' + esc(card.domain) + '</div><div class="sl-t">' + esc(card.title) + '</div>';
+    }
+    el.style.cursor = "pointer";
+    el.onclick = () => openPicker(idx);
+  };
+  fill($("#slotA"), a, '点这里选第一张', 0);
+  fill($("#slotB"), b, '点这里选第二张', 1);
+}
+
+/* ===== 选卡：当前卡包 / 收藏 / 历史 ===== */
+let pickTarget = 0, pickScope = "pack", pickQuery = "";
+
+function pickSource(){
+  if(pickScope === "fav") return S.cards.filter(c => c.saved);
+  if(pickScope === "all") return S.cards;
+  return (S.current && S.current.length) ? S.current : S.cards.slice(-10);
+}
+
+function pickerCounts(){
+  const pack = (S.current && S.current.length) ? S.current.length : Math.min(10, S.cards.length);
+  return { pack: pack, fav: S.cards.filter(c => c.saved).length, all: S.cards.length };
+}
+
+function renderPicker(){
+  const cnts = pickerCounts();
+  $$("#pickScope button").forEach(b => {
+    b.classList.toggle("on", b.dataset.scope === pickScope);
+    const badge = b.querySelector(".cnt");
+    if(badge){
+      const n = cnts[b.dataset.scope] || 0;
+      badge.textContent = n ? String(n) : "";
+    }
+  });
+
+  let list = pickSource().slice().reverse();
+  if(pickQuery){
+    const q = pickQuery.toLowerCase();
+    list = list.filter(c => ((c.title || "") + " " + (c.body || "") + " " + (c.domain || "")).toLowerCase().includes(q));
+  }
+  list = list.slice(0, 200);
+
+  const box = $("#pickList");
+  if(!list.length){
+    box.innerHTML = '<div class="pickEmpty">' +
+      (pickQuery ? "没有匹配的卡片" : (pickScope === "pack" ? "当前卡包是空的，先抽一包" : "这里还没有卡片")) +
+      '</div>';
+    return;
+  }
+
+  const sel = S.pair[pickTarget];
+  box.innerHTML = list.map(c =>
+    '<button class="pickItem' + (sel && sel.id === c.id ? " on" : "") + '" data-id="' + esc(c.id) + '">' +
+      '<span class="pi-d">' + esc(c.domain || "") + '</span>' +
+      '<span class="pi-t">' + esc(c.title || "") + '</span>' +
+    '</button>'
+  ).join("");
+
+  box.querySelectorAll(".pickItem").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.id;
+      const card = S.cards.find(x => x.id === id) || (S.current || []).find(x => x.id === id);
+      if(!card) return;
+      S.pair[pickTarget] = card;
+      closePicker();
+      renderPair();
+      $("#collideOut").textContent = "";
+      $("#collideOut").className = "out";
+    };
+  });
+}
+
+function openPicker(target){
+  pickTarget = target;
+  pickQuery = "";
+  const inp = $("#pickSearch");
+  if(inp) inp.value = "";
+  renderPicker();
+  $("#pickMask").classList.add("on");
+  setTimeout(() => { const i = $("#pickSearch"); if(i) i.focus(); }, 50);
+}
+
+function closePicker(){ $("#pickMask").classList.remove("on"); }
+
+function pickPair(){
+  const pool = S.cards.filter(c => c.saved);
+  const src = pool.length >= 2 ? pool : S.cards;
+  if(src.length < 2){ toast("至少需要两张卡，先抽一包"); return null; }
+  const i = Math.floor(Math.random()*src.length);
+  let j = Math.floor(Math.random()*(src.length-1));
+  if(j >= i) j++;
+  return [src[i], src[j]];
+}
+
+/* ===== 轻量 markdown 渲染（先转义再上标签，避免注入） ===== */
+function inlineMD(escaped){
+  return escaped
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/↔|→/g, m => '<span class="arrow">' + m + '</span>');
+}
+
+function renderMD(text){
+  const lines = esc(String(text || "")).split("\n");
+  const out = [];
+  const buf = [];
+  let inList = false;
+
+  const flushP = () => {
+    if(buf.length){ out.push("<p>" + buf.join("<br>") + "</p>"); buf.length = 0; }
+  };
+  const closeList = () => { if(inList){ out.push("</ul>"); inList = false; } };
+
+  for(const raw of lines){
+    const line = raw.trim();
+
+    if(!line){ flushP(); if(inList) closeList(); continue; }
+
+    const h = line.match(/^#{1,4}\s+(.+)$/);
+    if(h){ flushP(); closeList(); out.push("<h4>" + inlineMD(h[1]) + "</h4>"); continue; }
+
+    const li = line.match(/^[-*]\s+(.+)$/);
+    if(li){
+      flushP();
+      if(!inList){ out.push('<ul>'); inList = true; }
+      out.push("<li>" + inlineMD(li[1]) + "</li>");
+      continue;
+    }
+    closeList();
+
+    // 1) / 1. / 1、 开头的段落，加序号徽章
+    const num = line.match(/^(\d)[).、]\s*(.+)$/);
+    if(num){
+      flushP();
+      out.push('<p><span class="numbadge">' + num[1] + '</span>' + inlineMD(num[2]) + '</p>');
+      continue;
+    }
+
+    buf.push(inlineMD(line));
+  }
+  flushP();
+  closeList();
+  return out.join("");
+}
+
+/* ===== 碰撞记录 ===== */
+function fmtTime(ts){
+  const d = new Date(ts);
+  const p2 = n => String(n).padStart(2, "0");
+  return (d.getMonth()+1) + "/" + d.getDate() + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
+}
+
+function saveCollide(a, b, text){
+  S.collides.unshift({
+    id: uid(),
+    a: { id: a.id, title: a.title, domain: a.domain },
+    b: { id: b.id, title: b.title, domain: b.domain },
+    text,
+    ts: Date.now(),
+  });
+  S.collides = S.collides.slice(0, 40);
+  try{ localStorage.setItem(LS_COLLIDES, JSON.stringify(S.collides)); }catch(e){}
+}
+
+function renderCollideHistory(){
+  const box = $("#collideHist");
+  if(!box) return;
+  if(!S.collides.length){ box.innerHTML = ""; return; }
+
+  box.innerHTML = "<h3>之前的碰撞 · " + S.collides.length + "</h3>" +
+    S.collides.map(c =>
+      '<div class="ci" data-ci="' + c.id + '">' +
+        '<div class="ciHead">' +
+          '<span class="a">' + esc(c.a.title) + '</span>' +
+          '<span class="x">×</span>' +
+          '<span class="b">' + esc(c.b.title) + '</span>' +
+          '<span class="t">' + fmtTime(c.ts) + '</span>' +
+        '</div>' +
+        '<div class="ciBody md-body">' + renderMD(c.text) + '</div>' +
+      '</div>'
+    ).join("");
+
+  box.querySelectorAll(".ciHead").forEach(h => {
+    h.onclick = () => h.parentElement.classList.toggle("open");
+  });
+}
+
+async function collide(){
+  if(!S.pair[0] || !S.pair[1]){ toast("先选两张卡"); return; }
+  if(!(S.cfg.base && S.cfg.model)){ toast("碰撞需要 API，请先在设置里填"); return; }
+
+  const out = $("#collideOut");
+  out.className = "out";
+  out.innerHTML = '<span style="color:var(--fg3)">撞一下…</span>';
+
+  try{
+    const txt = await chat([
+      { role:"system", content:"你是一个跨界联想引擎。回答具体、有信息量、不说客套话。用 markdown：每段用 ### 小标题，关键对应关系用 **加粗**，机制用 `代码` 标记。" },
+      { role:"user", content: buildCollidePrompt(S.pair[0], S.pair[1]) },
+    ], { maxTokens: 3000, temperature: 1.0 });
+
+    out.className = "out md-body";
+    out.innerHTML = renderMD(txt);
+    saveCollide(S.pair[0], S.pair[1], txt);
+    renderCollideHistory();
+  }catch(err){
+    out.className = "out";
+    out.innerHTML = '<div class="errBar" style="margin:0"><div class="errMsg"><b>碰撞失败</b><span>' +
+      esc(err.message) + '</span></div></div>';
+  }
+}
+
+/* ============ 导出 ============ */
+function exportMd(){
+  const list = S.cards.filter(c => c.saved).slice().reverse();
+  if(!list.length){ toast("灵感库是空的"); return; }
+
+  const byDomain = {};
+  list.forEach(c => { (byDomain[c.domain] ||= []).push(c); });
+
+  let md = "# 灵感库\n\n";
+  md += "> 导出于 " + new Date().toLocaleString("zh-CN") + " · 共 " + list.length + " 条\n\n";
+  Object.keys(byDomain).sort().forEach(d => {
+    md += "## " + d + "\n\n";
+    byDomain[d].forEach(c => {
+      md += "### " + c.title + "\n\n";
+      md += c.body + "\n\n";
+      if(c.source) md += "*" + c.source + "*\n\n";
+    });
+  });
+
+  const blob = new Blob([md], { type:"text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "灵感库-" + new Date().toISOString().slice(0,10) + ".md";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  toast("已导出 " + list.length + " 条");
+}
+
+/* ============ 设置 ============ */
+/* ===== 服务预设：云端 DeepSeek / 本地 LM Studio、Ollama / 自定义 ===== */
+const PRESETS = {
+  deepseek: {
+    base: "https://api.deepseek.com",
+    model: "deepseek-flash",
+    hint: "云端 API，需要 Key。",
+  },
+  lmstudio: {
+    base: "http://localhost:1234/v1",
+    model: "",
+    hint: "LM Studio 启动 Local Server 后，把模型标识填到 Model，Key 留空。记得在 LM Studio 设置里打开 CORS。",
+  },
+  ollama: {
+    base: "http://localhost:11434/v1",
+    model: "llama3.1",
+    hint: "Ollama 需要设置环境变量 OLLAMA_ORIGINS=* 再重启，浏览器才能跨域调用。Key 留空。",
+  },
+  opencode: {
+    base: "https://opencode.ai/zen/v1",
+    model: "gpt-6-luna",
+    hint: "OpenCode Go / Console：先订阅或在 console 充值，复制 API key。模型名用控制台里的 ID（gpt-6-luna、glm-5.3、kimi-k3…）。走的是 /v1/chat/completions。",
+  },
+  custom: {
+    base: "",
+    model: "",
+    hint: "填任意 OpenAI 兼容地址，比如 Unsloth Studio 显示的 http://localhost:端口/v1。Key 留空即可。",
+  },
+};
+
+function detectPreset(base){
+  const b = String(base || "");
+  if(/11434/.test(b)) return "ollama";
+  if(/1234/.test(b)) return "lmstudio";
+  if(/deepseek/i.test(b)) return "deepseek";
+  if(/opencode\.ai/i.test(b)) return "opencode";
+  return "custom";
+}
+
+function renderPresetUI(){
+  const el = $("#cfgPreset");
+  if(!el) return;
+  const p = detectPreset($("#cfgBase").value);
+  $$("#cfgPreset button").forEach(b => b.classList.toggle("on", b.dataset.preset === p));
+  const h = $("#presetHint");
+  if(h) h.textContent = (PRESETS[p] || PRESETS.custom).hint;
+}
+
+function applyPreset(key){
+  const c = PRESETS[key];
+  if(!c) return;
+  $("#cfgBase").value = c.base;           // custom 是空串，等于清空让用户自己填
+  $("#cfgModel").value = c.model || "";   // LM Studio / custom 不预设模型名
+  if(key !== "deepseek") $("#cfgKey").value = "";
+  renderPresetUI();
+  const msg = key === "deepseek" ? "已切到 DeepSeek，填 Key 即可"
+            : key === "opencode" ? "已填 OpenCode 端点，填 Console 里的 API key 和模型 ID"
+            : "本地地址已填好，Model 填服务里加载的那个";
+  toast(msg);
+}
+
+let pendingMode = "C";
+
+function setModeUI(m){
+  pendingMode = m;
+  $$("#cfgMode button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("#modeHint").textContent = (MODE_INFO[m] || MODE_INFO.C).hint;
+}
+
+function currentMode(){
+  return MODE_ORDER.includes(S.cfg.mode) ? S.cfg.mode : "C";
+}
+
+const RATIO_STEPS = [0, 2, 4, 6, 8, 10];
+
+function bumpRatio(){
+  const cur = Number(S.cfg.ratio) || 0;
+  const at = RATIO_STEPS.indexOf(cur);
+  const next = RATIO_STEPS[(at < 0 ? 0 : at + 1) % RATIO_STEPS.length];
+  S.cfg.ratio = next;
+  saveCfg();
+  refreshHint();
+  toast(next === 0 ? "全领域随机 · 下一包生效" : "主题占 " + next + "/10 · 下一包生效");
+}
+
+function cycleMode(){
+  const i = MODE_ORDER.indexOf(currentMode());
+  S.cfg.mode = MODE_ORDER[(i + 1) % MODE_ORDER.length];
+  saveCfg();
+  refreshHint();
+  toast("取材方式 " + S.cfg.mode + " · " + MODE_INFO[S.cfg.mode].name);
+}
+
+function setSetTab(t){
+  $$("#setTabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  $$(".setPane").forEach(p => p.classList.toggle("on", p.id === "pane-" + t));
+  if(t === "data") updateDataStat();
+}
+
+function openSettings(){
+  ensureCurrentInList();
+  renderModelList();
+  const cur = ensureModels().find(x =>
+    modelKeyOf(x.base, x.model) === modelKeyOf(S.cfg.base, S.cfg.model));
+  if(cur){
+    editingModelId = cur.id;
+    $("#cfgLabel").value = cur.label || "";
+    $("#cfgBase").value = cur.base || "";
+    $("#cfgModel").value = cur.model || "";
+    $("#cfgKey").value = cur.key || "";
+    $("#cfgThinking").checked = !!cur.thinking;
+    renderPresetUI();
+    renderModelList();
+  }else{
+    editingModelId = null;
+    $("#cfgLabel").value = "";
+    $("#cfgBase").value  = S.cfg.base || "";
+    $("#cfgModel").value = S.cfg.model || "";
+    $("#cfgKey").value   = S.cfg.key || "";
+    $("#cfgThinking").checked = !!S.cfg.thinking;
+    renderModelList();
+  }
+  closeEditor();
+  $("#cfgRatio").value = S.cfg.ratio;
+  $("#cfgRatioVal").textContent = S.cfg.ratio;
+  $("#cfgRotate").value = S.cfg.rotateSec;
+  $("#cfgRotateVal").textContent = S.cfg.rotateSec;
+  $("#cfgRefresh").value = S.cfg.refreshMin;
+  $("#cfgRefreshVal").textContent = S.cfg.refreshMin;
+  if($("#cfgReview")) $("#cfgReview").checked = S.cfg.review !== false;
+  $("#testOut").textContent = "";
+  setModeUI(currentMode());
+  renderPresetUI();
+  setSetTab("model");
+  $("#mask").classList.add("on");
+}
+
+function closeSettings(){ $("#mask").classList.remove("on"); }
+
+function applyCfg(){
+  saveModelFromEditor({ silent: true });
+  S.cfg.ratio = Number($("#cfgRatio").value);
+  S.cfg.mode = pendingMode;
+  S.cfg.rotateSec = Number($("#cfgRotate").value);
+  S.cfg.refreshMin = Number($("#cfgRefresh").value);
+  S.cfg.review = $("#cfgReview") ? $("#cfgReview").checked : true;
+  saveCfg();
+  refreshHint();
+  closeSettings();
+  if(S.view === "bubble"){ resetRotateTimer(); startRefreshTimer(); updateBubbleInfo(); }
+  toast(S.cfg.key ? "已保存" : "已清空 API，使用演示数据");
+}
+
+/* 用面板里当前填的值发一个最小请求，直接告诉你哪一步不对 */
+async function testConn(){
+  const btn = $("#btnTest"), out = $("#testOut");
+  const snapshot = {...S.cfg};
+
+  S.cfg = {
+    ...snapshot,
+    base:  $("#cfgBase").value.trim(),
+    model: $("#cfgModel").value.trim(),
+    key:   $("#cfgKey").value.trim(),
+    thinking: $("#cfgThinking").checked,
+  };
+
+  btn.disabled = true;
+  btn.textContent = "测试中…";
+  out.textContent = "";
+  out.style.color = "var(--fg2)";
+
+  const t0 = Date.now();
+  try{
+    const r = await chat([
+      { role:"system", content:"你是连通性测试。只回两个字，不要解释。" },
+      { role:"user", content:"回复：可用" },
+    ], { maxTokens: 32, temperature: 0, thinking: false });
+
+    out.innerHTML = "✓ 通了（" + ((Date.now()-t0)/1000).toFixed(1) + "s）· 模型回：" + esc(String(r).trim().slice(0,40));
+    out.style.color = "var(--acc)";
+  }catch(e){
+    out.textContent = "✗ " + e.message;
+    out.style.color = "var(--warn)";
+  }finally{
+    S.cfg = snapshot;
+    btn.disabled = false;
+    btn.textContent = "测试连接";
+  }
+}
+
+/* ---- 已配置的模型列表（快速切换） ---- */
+const MODELS_KEY = "kg_models_v1";
+
+function loadModels(){
+  let list = [];
+  try{ list = JSON.parse(localStorage.getItem(MODELS_KEY) || "[]") || []; }catch(e){ list = []; }
+  const curK = modelKeyOf(S.cfg.base, S.cfg.model);
+  const out = [];
+  let changed = false;
+  list.forEach(x => {
+    if(!x || !x.model) return;
+    if(typeof x.verified === "boolean"){ out.push(x); return; }
+    changed = true;
+    // 没有验证标记的旧条目：只有正是当前在用的那个才留下
+    if(modelKeyOf(x.base, x.model) === curK) out.push(Object.assign({}, x, { verified: true }));
+  });
+  if(changed) saveModels(out);
+  return out;
+}
+
+/* 真正跑通一次之后才把模型记进列表 */
+function markModelVerified(){
+  const base = String(S.cfg.base || "").trim();
+  const model = String(S.cfg.model || "").trim();
+  if(!base || !model) return;
+  const list = loadModels();
+  const i = list.findIndex(x => (x.base || "") === base && (x.model || "") === model);
+  if(i >= 0){
+    list[i].verified = true;
+    list[i].key = S.cfg.key || list[i].key || "";
+    list[i].ts = Date.now();
+    list.unshift(list.splice(i, 1)[0]);
+  }else{
+    list.unshift({ base, model, key: S.cfg.key || "", verified: true, ts: Date.now() });
+  }
+  saveModels(list);
+}
+
+function saveModels(list){
+  try{ localStorage.setItem(MODELS_KEY, JSON.stringify(list.slice(0, 12))); }catch(e){}
+}
+
+/* 每次配置变化，把当前 base+model 记进列表（去重，最近的在前） */
+function syncModelList(){
+  const base = String(S.cfg.base || "").trim();
+  const model = String(S.cfg.model || "").trim();
+  if(!model) return;
+  const list = loadModels();
+  const i = list.findIndex(x => (x.base || "") === base && (x.model || "") === model);
+  if(i < 0) return;                       // 没验证过的不收录
+  list[i].key = S.cfg.key || list[i].key || "";
+  list[i].ts = Date.now();
+  saveModels(list);
+}
+
+function modelKeyOf(base, model){
+  return String(base || "") + "|" + String(model || "");
+}
+
+
+let editingModelId = null;
+
+function ensureModels(){
+  const list = loadModels();
+  let changed = false;
+  list.forEach(x => { if(!x.id){ x.id = uid(); changed = true; } });
+  if(changed) saveModels(list);
+  return list;
+}
+
+/* 当前在用的配置也放进列表，哪怕还没跑通过 */
+function ensureCurrentInList(){
+  const list = ensureModels();
+  const k = modelKeyOf(S.cfg.base, S.cfg.model);
+  if(!S.cfg.model) return list;
+  if(list.some(x => modelKeyOf(x.base, x.model) === k)) return list;
+  list.unshift({
+    id: uid(), base: S.cfg.base, model: S.cfg.model, key: S.cfg.key || "",
+    label: "", thinking: !!S.cfg.thinking, verified: false, ts: Date.now(),
+  });
+  saveModels(list);
+  return list;
+}
+
+function renderModelList(){
+  const box = $("#mdlList");
+  if(!box) return;
+  const list = ensureModels();
+  if(!list.length){
+    box.innerHTML = '<div class="empty" style="padding:10px 0;font-size:12px">还没有配置模型</div>';
+    return;
+  }
+  const curK = modelKeyOf(S.cfg.base, S.cfg.model);
+
+  box.innerHTML = list.map(x => {
+    const isCur = modelKeyOf(x.base, x.model) === curK;
+    const host = String(x.base || "").replace(/^https?:\/\//, "").split("/")[0];
+    return '<button class="mdlItem' + (isCur ? " on" : "") + (x.id === editingModelId ? " editing" : "") + '" data-id="' + x.id + '">' +
+      '<span class="mn"><b>' + esc(x.label || x.model) + '</b>' +
+      '<span>' + esc(x.model) + (host ? " · " + esc(host) : "") + '</span></span>' +
+      (isCur ? '<span class="badge2">使用中</span>'
+             : (x.verified ? '' : '<span class="badge2 warn">未验证</span>')) +
+      '<span class="del" data-del="' + x.id + '" title="删除">×</span>' +
+    '</button>';
+  }).join("");
+
+  box.querySelectorAll(".mdlItem").forEach(b => {
+    b.onclick = ev => {
+      if(ev.target.closest("[data-del]")) return;
+      useModel(b.dataset.id);
+    };
+  });
+  box.querySelectorAll("[data-del]").forEach(d => {
+    d.onclick = ev => { ev.stopPropagation(); deleteModel(d.dataset.del); };
+  });
+}
+
+function openEditor(){
+  const el = $("#mdlEditor");
+  if(el) el.classList.add("on");
+}
+
+function closeEditor(){
+  const el = $("#mdlEditor");
+  if(el) el.classList.remove("on");
+}
+
+function loadModelToEditor(id){
+  const x = ensureModels().find(m => m.id === id);
+  if(!x) return;
+  editingModelId = id;
+  $("#cfgLabel").value = x.label || "";
+  $("#cfgBase").value = x.base || "";
+  $("#cfgModel").value = x.model || "";
+  $("#cfgKey").value = x.key || "";
+  $("#cfgThinking").checked = !!x.thinking;
+  $("#testOut").textContent = "";
+  renderPresetUI();
+  renderModelList();
+  openEditor();
+}
+
+function resetEditor(){
+  editingModelId = null;
+  $("#cfgLabel").value = "";
+  $("#cfgBase").value = "";
+  $("#cfgModel").value = "";
+  $("#cfgKey").value = "";
+  $("#cfgThinking").checked = false;
+  $("#testOut").textContent = "";
+  renderPresetUI();
+  renderModelList();
+  openEditor();
+}
+
+/* 点列表项 = 切过去用 */
+function useModel(id){
+  const x = ensureModels().find(m => m.id === id);
+  if(!x) return;
+  S.cfg.base = x.base || "";
+  S.cfg.model = x.model || "";
+  S.cfg.key = x.key || "";
+  S.cfg.thinking = !!x.thinking;
+  saveCfg();
+  refreshHint();
+  loadModelToEditor(id);
+}
+
+function saveModelFromEditor(opts = {}){
+  const base = $("#cfgBase").value.trim();
+  const model = $("#cfgModel").value.trim();
+  const key = $("#cfgKey").value.trim();
+  const label = $("#cfgLabel").value.trim();
+  const thinking = $("#cfgThinking").checked;
+  if(!model){ if(!opts.silent) toast("Model 不能为空"); return false; }
+
+  const list = ensureModels();
+  let item = editingModelId ? list.find(x => x.id === editingModelId) : null;
+  if(item){
+    const changed = item.base !== base || item.model !== model || item.key !== key || !!item.thinking !== thinking;
+    item.base = base; item.model = model; item.key = key;
+    item.label = label; item.thinking = thinking; item.ts = Date.now();
+    if(changed) item.verified = false;   // 真的改过才重新验证
+  }else{
+    item = { id: uid(), base, model, key, label, thinking, verified: false, ts: Date.now() };
+    list.unshift(item);
+    editingModelId = item.id;
+  }
+  saveModels(list);
+
+  S.cfg.base = base;
+  S.cfg.model = model;
+  S.cfg.key = key;
+  S.cfg.thinking = thinking;
+  saveCfg();
+  refreshHint();
+  renderModelList();
+
+  if(!opts.silent) toast("已保存并使用 " + (label || model));
+  if(!opts.keepOpen) closeEditor();
+  return true;
+}
+
+function deleteModel(id){
+  const list = ensureModels();
+  const x = list.find(m => m.id === id);
+  if(!x) return;
+  const wasCurrent = modelKeyOf(x.base, x.model) === modelKeyOf(S.cfg.base, S.cfg.model);
+  const rest = list.filter(m => m.id !== id);
+  saveModels(rest);
+  if(editingModelId === id){ editingModelId = null; resetEditor(); }
+  renderModelList();
+  if(wasCurrent && rest.length) useModel(rest[0].id);
+  toast("已删除 " + (x.label || x.model));
+}
+
+function renderModelMenu(){
+  const box = $("#modelMenuList");
+  if(!box) return;
+  const cur = modelKeyOf(S.cfg.base, S.cfg.model);
+  const list = loadModels();          // 都是用户自己加的，全部列出来（没跑通的标「未验证」）
+
+  // 当前配置还没跑通过：也要露出来，否则用户不知道自己正在用什么
+  if(S.cfg.model && !list.some(x => modelKeyOf(x.base, x.model) === cur)){
+    list.unshift({ base: S.cfg.base, model: S.cfg.model, key: S.cfg.key, verified: false, cur: true });
+  }
+
+  if(!list.length){
+    box.innerHTML = '<div class="empty" style="padding:10px 9px;font-size:12px">还没有配置模型</div>';
+    return;
+  }
+
+  box.innerHTML = list.map((x, i) => {
+    const k = modelKeyOf(x.base, x.model);
+    const host = String(x.base || "").replace(/^https?:\/\//, "").split("/")[0];
+    return '<button data-i="' + (x.cur ? -1 : i) + '" class="' + (k === cur ? "on" : "") + '">' +
+      '<span class="mName">' + esc(x.label || x.model) + '</span>' +
+      '<span class="mBase">' + (x.verified ? esc(host) : "未验证") + '</span>' +
+      (k === cur ? '<svg class="mCheck" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>' : '') +
+    '</button>';
+  }).join("");
+
+  box.querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      const idx = Number(b.dataset.i);
+      if(idx < 0) return;                       // 当前项，点了没意义
+      const x = list[idx];
+      if(!x) return;
+      S.cfg.base = x.base || "";
+      S.cfg.model = x.model || "";
+      S.cfg.key = x.key || "";
+      S.cfg.thinking = !!x.thinking;
+      saveCfg();
+      refreshHint();
+      $("#modelMenu").classList.remove("on");
+      toast("已切到 " + S.cfg.model);
+    };
+  });
+}
+
+function refreshHint(){
+  const m = currentMode();
+  $("#ratioNum").textContent = S.cfg.ratio + "/10";
+  $("#ratioNum").title = "主题占 " + S.cfg.ratio + "/10（点击调整）";
+  $("#modeTag").textContent = m;
+  $("#modeTag").title = "取材方式 " + m + " · " + MODE_INFO[m].name + "（点击切换）";
+  const ok = S.cfg.base && S.cfg.model;
+  syncModelList();
+  const mt = $("#modelTag");
+  if(mt){
+    if(ok){
+      const curM = ensureModels().find(x =>
+        modelKeyOf(x.base, x.model) === modelKeyOf(S.cfg.base, S.cfg.model));
+      mt.textContent = (curM && curM.label) ? curM.label : S.cfg.model;
+      mt.classList.remove("demo");
+      mt.title = "当前模型 · " + S.cfg.model + "（点击打开设置）";
+    }else{
+      mt.textContent = "演示";
+      mt.classList.add("demo");
+      mt.title = "未配置模型，正在用演示数据（点击配置）";
+    }
+  }
+
+  $("#hintText").textContent = ok
+    ? "已连接 · " + S.cfg.model + (S.cfg.key ? "" : " · 无需 key")
+    : "未配置 API · 会先用演示数据";
+}
+
+/* ============ 演示数据 ============ */
+const DEMO_CARDS = [
+  { title:"为什么章鱼游泳时,有两颗心脏会停跳?", domain:"生物学", source:"海洋生物学 · 头足类",
+    body:"章鱼有三颗心脏:两颗鳃心负责把血液泵过鳃部供氧,一颗主心脏供全身。但游泳时身体需要更有力的推进,鳃心会被自主神经系统关闭以节省能量——代价是血氧骤降,章鱼很快疲劳,所以它们更爱爬行而不是游泳。" },
+  { title:"为什么欧洲大城市的富人区,几乎都在西边?", domain:"城市地理", source:"城市社会学 · 风向与污染",
+    body:"工业革命时期的主导西风把煤烟和工厂废气吹向东侧,西区因此成为空气最好的下风向。房价跟着空气质量走,富人在西、工人在东的格局就此固化,并延续到污染消失之后——这条路径依赖至今仍影响着巴黎、伦敦、布达佩斯的地价分布。" },
+  { title:"为什么电梯的「关门」键大多是假的?", domain:"工程", source:"无障碍设计 · 消防规范",
+    body:"1990 年美国《美国残疾人法案》要求电梯门开启时间必须足够长,以保证行动不便者通行,而「关门」键会缩短这个时间,与法规冲突。厂商索性把按钮做成装饰,按下只亮灯不生效。中国多数公共电梯沿用同一套逻辑。" },
+  { title:"为什么降落伞没有备用伞?", domain:"航空安全", source:"跳伞运动 · 风险工程",
+    body:"跳伞确实有备用伞——但那是运动跳伞。军用静态绳跳伞和航天返回舱反而常常没有,因为备用伞系统会引入新的失效点:缠绕、误开、增加重量与开伞冲击。这是可靠性工程里的经典权衡:冗余并不总是降低总风险。" },
+  { title:"为什么可乐改过一次配方,两个月就惨败?", domain:"商业史", source:"品牌心理学 · 1985 新可乐",
+    body:"1985 年可口可乐在 19 万次盲测中证明新配方更好喝,于是停产经典款。结果销量暴跌——盲测问的是「哪杯好喝」,而真实购买问的是「这是不是我的可乐」。产品属性可以被测量,身份认同不能。" },
+  { title:"为什么飞机舷窗是圆的?", domain:"材料力学", source:"航空结构 · 应力集中",
+    body:"1954 年彗星号客机两次空中解体,原因是方形舷窗的四个角形成应力集中点,增压反复循环后裂纹从角部扩展。改成圆角后应力沿曲线均匀分布。今天所有增压舱的开口——舱门、检修口——都必须圆角,这是一条用事故换来的规则。" },
+  { title:"为什么全世界叫「妈妈」的发音都差不多?", domain:"语言学", source:"音系学 · 婴儿发声",
+    body:"婴儿最早能发出的辅音是双唇音 m/b/p,最容易的元音是开口的 a。所以「mama」「baba」几乎是所有语言里最早的词——不是巧合传播,而是发音器官发育顺序决定的。语言学家把这类词叫「语音象征」,它们独立地在各语系中反复诞生。" },
+  { title:"为什么手术服是蓝绿色,而不是白色?", domain:"医学", source:"视觉生理 · 补色残像",
+    body:"医生长时间盯着红色的血和组织,视网膜会产生红色补色残像,抬头看白墙时会看到绿色的血影,干扰判断。蓝绿色是红色的补色,能中和残像。另外深色也不容易让血迹显得触目惊心。" },
+  { title:"为什么高速公路大多不装路灯?", domain:"交通工程", source:"道路照明 · 眩光与成本",
+    body:"路灯会让驾驶员瞳孔收缩,反而降低对远处暗处的识别能力。高速公路上车速快,车灯已经足够照亮前方 100 米以上,连续照明带来的边际收益很低,而每公里年电费和维护成本极高。所以只在隧道、匝道、事故多发段装灯。" },
+  { title:"Rust 的借用检查器,最初是为了避免什么?", domain:"编程语言", source:"语言设计 · 内存安全",
+    body:"它不只是为了「防悬垂指针」。Rust 早期真正要解决的是并发数据竞争——多个线程同时读写同一块内存。所有权和借用规则在编译期就把「谁能在什么时候碰这块内存」编码成类型约束,于是数据竞争从运行时偶发 bug 变成编译错误。这是把一类问题从「测试发现」提前到「类型系统拒绝」。" },
+];
+
+/* ============ 事件绑定 ============ */
+function bind(){
+  $("#btnDraw").onclick = draw;
+  $("#btnSettings").onclick = openSettings;
+  $$("#setTabs button").forEach(b => { b.onclick = () => setSetTab(b.dataset.tab); });
+  $$("#cfgPreset button").forEach(b => { b.onclick = () => applyPreset(b.dataset.preset); });
+  $("#cfgBase").oninput = renderPresetUI;
+  $("#btnFavNav").onclick = () => setView("fav");
+  $("#btnHistNav").onclick = () => setView("hist");
+  $("#btnCancel").onclick = closeSettings;
+  $("#btnSave").onclick = applyCfg;
+  $("#btnTest").onclick = testConn;
+  $("#mask").onclick = e => { if(e.target.id === "mask") closeSettings(); };
+  if(/[?&]seam=1\b/.test(location.search)) document.documentElement.classList.add("seam-debug");
+
+  const rvMask = $("#reviewMask");
+  if(rvMask){
+    rvMask.onclick = e => { if(e.target.id === "reviewMask") rvMask.classList.remove("on"); };
+    const rvClose = $("#btnRvClose");
+    if(rvClose) rvClose.onclick = () => rvMask.classList.remove("on");
+    const rvApply = $("#btnRvApply");
+    if(rvApply) rvApply.onclick = () => {
+      if(rvApplied){
+        restoreCard(rvTarget, rvSnapshot);
+        rvApplied = false;
+        rvMask.classList.remove("on");
+        return;
+      }
+      if(!rvRewrite || !rvTarget) return;
+      applyRewriteToCard(rvTarget, rvRewrite);
+      rvMask.classList.remove("on");
+    };
+  }
+
+  $("#cfgRatio").oninput = e => { $("#cfgRatioVal").textContent = e.target.value; };
+  $("#cfgRotate").oninput = e => { $("#cfgRotateVal").textContent = e.target.value; };
+  $("#cfgRefresh").oninput = e => { $("#cfgRefreshVal").textContent = e.target.value; };
+  const themeInput = $("#theme");
+  if(themeInput){
+    try{
+      const savedTheme = localStorage.getItem("kg_theme_input_v1");
+      if(savedTheme) themeInput.value = savedTheme;
+    }catch(e){}
+    themeInput.addEventListener("focus", () => {
+      renderThemeMenu();
+      if($("#themeMenu").innerHTML) $("#themeMenu").classList.add("on");
+    });
+    themeInput.addEventListener("input", () => {
+      $("#themeMenu").classList.remove("on");
+      saveThemeInput(themeInput.value);
+    });
+  }
+  document.addEventListener("click", ev => {
+    const menu = $("#themeMenu");
+    if(menu && !ev.target.closest(".themeWrap")) menu.classList.remove("on");
+    const more = $("#histMoreMenu");
+    if(more && !ev.target.closest(".histFilter")) more.classList.remove("on");
+    const tip = $("#bubbleTip");
+    if(tip && !ev.target.closest("#bubbleTip") && !ev.target.closest("#btnBubbleHelp")) tip.classList.remove("on");
+    const mm = $("#modelMenu");
+    if(mm && !ev.target.closest(".modelWrap")) mm.classList.remove("on");
+  });
+  const helpBtn = $("#btnBubbleHelp");
+  if(helpBtn){
+    helpBtn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      $("#bubbleTip").classList.toggle("on");
+    });
+  }
+
+  const moreBtn = $("#histMore");
+  if(moreBtn){
+    moreBtn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      $("#histMoreMenu").classList.toggle("on");
+    });
+  }
+  window.addEventListener("resize", () => { if(S.view === "hist") layoutHistTabs(); });
+
+  const modelTagBtn = $("#modelTag");
+  if(modelTagBtn){
+    modelTagBtn.onclick = ev => {
+      ev.stopPropagation();
+      renderModelMenu();
+      $("#modelMenu").classList.toggle("on");
+    };
+  }
+  const modelCfgBtn = $("#modelCfg");
+  if(modelCfgBtn){
+    modelCfgBtn.onclick = ev => {
+      ev.stopPropagation();
+      $("#modelMenu").classList.remove("on");
+      openSettings();
+    };
+  }
+
+  $("#ratioNum").onclick = ev => { ev.stopPropagation(); bumpRatio(); };
+  $("#modeTag").onclick = ev => { ev.stopPropagation(); cycleMode(); };
+  $$("#cfgMode button").forEach(b => { b.onclick = () => setModeUI(b.dataset.mode); });
+
+  $("#btnBubblePause").onclick = () => {
+    bubblePaused = !bubblePaused;
+    $("#bubbleStage").classList.toggle("paused", bubblePaused);
+    updateBubbleInfo();
+    if(bubblePaused){ pauseRotate(); }
+    else{ resumeRotate(); }
+    toast(bubblePaused ? "轮播已暂停" : "继续轮播");
+  };
+  $("#btnBubbleNew").onclick = () => bubbleRefresh(true);
+  $("#btnBubblePrev").onclick = () => {
+    if(!bubbleItems.length){ toast("还没有泡泡，先换一包"); return; }
+    focusBubble(bubbleIdx - 1, true);
+  };
+  $("#btnBubbleNext").onclick = () => {
+    if(!bubbleItems.length){ toast("还没有泡泡，先换一包"); return; }
+    focusBubble(bubbleIdx + 1, true);
+  };
+
+  const stage = $("#bubbleStage");
+  /* 悬停泡泡就冻结，移开才恢复。
+     不能绑在 stage 的 mouseenter 上：鼠标已经在舞台里（空白处/别的泡泡）再移到卡片上时
+     mouseenter 不会再触发，进度条就继续走 —— 这正是"时好时坏"的来源。 */
+  /* 只有正在展示的那张大卡悬停才冻结计时；小泡泡不管。
+     用轮询 :hover 而不是 mouseover/mouseout：泡泡在漂移、切视图时 DOM 会被整块重建，
+     进出事件在这种场景下会漏发或顺序错乱，导致该恢复的时候不恢复。 */
+  let hoverPaused = false;
+  setInterval(() => {
+    if(S.view !== "bubble"){ hoverPaused = false; return; }
+    const card = document.querySelector("#bubbleStage .orbit.focus .bubble");
+    const on = !!(card && card.matches(":hover"));
+    if(on === hoverPaused) return;
+    hoverPaused = on;
+    if(bubblePaused || bubbleCollapsed) return;   // 手动暂停优先，不参与
+    if(on) pauseRotate();
+    else resumeRotate();
+  }, 120);
+
+  // 点舞台空白处收起大泡泡
+  stage.addEventListener("click", ev => {
+    if(ev.target.closest(".orbit")) return;
+    if(stage.classList.contains("has-focus")) unfocusBubble();
+  });
+
+  $$(".tab").forEach(t => t.onclick = () => setView(t.dataset.view));
+  $("#search").oninput = renderHist;
+  const addBtn = $("#btnModelAdd");
+  if(addBtn) addBtn.onclick = () => { resetEditor(); $("#cfgLabel").focus(); };
+  const mdlSaveBtn = $("#btnModelSave");
+  if(mdlSaveBtn) mdlSaveBtn.onclick = () => saveModelFromEditor();
+  const mdlCancelBtn = $("#btnModelCancel");
+  if(mdlCancelBtn) mdlCancelBtn.onclick = () => closeEditor();
+
+  const eyeBtn = $("#btnKeyEye");
+  if(eyeBtn) eyeBtn.onclick = () => {
+    const inp = $("#cfgKey");
+    const show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    eyeBtn.classList.toggle("off", !show);
+  };
+
+  $("#btnExport").onclick = exportMd;
+  $("#btnExportJSON").onclick = exportBackup;
+  $("#btnImport").onclick = () => $("#fileImport").click();
+  $("#fileImport").onchange = e => {
+    importBackupFile(e.target.files && e.target.files[0]);
+    e.target.value = "";
+  };
+  $("#btnWipe").onclick = () => {
+    if(!wipeArmed){
+      wipeArmed = true;
+      $("#btnWipe").textContent = "再点一次确认清空";
+      $("#btnWipe").classList.add("armed");
+      wipeTimer = setTimeout(resetWipe, 4000);
+      return;
+    }
+    resetWipe();
+    wipeAll();
+  };
+
+  $$("#pickScope button").forEach(b => {
+    b.onclick = () => { pickScope = b.dataset.scope; renderPicker(); };
+  });
+  $("#pickSearch").oninput = e => { pickQuery = e.target.value.trim(); renderPicker(); };
+  $("#btnPickCancel").onclick = closePicker;
+  $("#pickMask").onclick = e => { if(e.target.id === "pickMask") closePicker(); };
+
+  $("#btnPair").onclick = () => {
+    const p = pickPair();
+    if(p){ S.pair = p; renderPair(); $("#collideOut").textContent = ""; }
+  };
+  $("#btnCollide").onclick = collide;
+
+  document.addEventListener("keydown", e => {
+    if(e.key === "Escape"){ closeSettings(); closePicker(); }
+    const onInput = e.target instanceof Element && e.target.matches("input, textarea");
+    if(e.key === "Enter" && !onInput && S.view === "draw") draw();
+    if(S.view === "draw" && !onInput){
+      if(e.key === "ArrowLeft")  setSlide(S.slide - 1);
+      if(e.key === "ArrowRight") setSlide(S.slide + 1);
+    }
+  });
+}
+
+/* ============ 启动 ============ */
+load();
+bind();
+refreshHint();
+updateCounts();
+let lastView = "draw";
+try{ lastView = localStorage.getItem("kg_view_v1") || "draw"; }catch(e){}
+setView("draw");          // 先把抽卡视图的牌堆铺好
+restorePack();
+if(lastView && lastView !== "draw") setView(lastView);   // 再切回上次的视图
+</script>
+</body>
+</html>
